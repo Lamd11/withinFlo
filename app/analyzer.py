@@ -1,5 +1,5 @@
 from typing import List, Dict, Any
-import openai
+from openai import OpenAI
 from .models import UIElement, TestCase, TestStep
 import logging
 import os
@@ -18,76 +18,60 @@ class TestCaseAnalyzer:
         self.api_key = os.getenv("OPENAI_API_KEY")
         if not self.api_key:
             raise ValueError("OPENAI_API_KEY environment variable is not set")
-        openai.api_key = self.api_key
+        self.client = OpenAI(api_key=self.api_key)
 
     def _generate_test_case_prompt(self, element: UIElement) -> str:
-        return f"""Given the following UI element, generate a comprehensive test case:
+        return f"""Given the following UI element, generate a comprehensive test case in markdown format:
 
 Element Type: {element.element_type}
 Selector: {element.selector}
 Visible Text: {element.visible_text}
 Attributes: {element.attributes}
 
-Please generate a test case that includes:
-1. A descriptive title
-2. The type of test (functional, usability, or edge case)
-3. Priority level (high, medium, or low)
-4. A clear description
-5. Preconditions
-6. Step-by-step test steps with expected results
+Please generate a test case that follows this exact markdown format:
 
-Format the response as a JSON object with the following structure:
-{{
-    "test_case_title": "string",
-    "type": "functional|usability|edge_case",
-    "priority": "high|medium|low",
-    "description": "string",
-    "preconditions": ["string"],
-    "steps": [
-        {{
-            "step_number": 1,
-            "action": "string",
-            "expected_result": "string"
-        }}
-    ]
-}}
+### Test Case ID: TC_[ELEMENT_TYPE]_[SEQUENCE]
+* **Title:** [Descriptive title of what is being tested]
+* **Type:** [End-to-End | Functional | Usability | Edge Case]
+* **Priority:** [High | Medium | Low]
+* **Description:** [Clear description of what the test case verifies]
+* **Related Elements:**
+    * [List all related selectors and their purposes]
+* **Preconditions:**
+    * [List all required preconditions]
+* **Steps:**
+    1. **Action:** [Detailed action to perform]
+       **Expected Result:** [Expected outcome]
+    [Continue with numbered steps...]
+* **Postconditions:**
+    * [List all expected postconditions]
 
-Focus on testing the element's core functionality and potential edge cases."""
+Focus on creating detailed, actionable test steps that verify the element's functionality and potential edge cases. Include all relevant selectors and expected behaviors."""
 
     def analyze_element(self, element: UIElement) -> TestCase:
         try:
-            response = openai.ChatCompletion.create(
+            response = self.client.chat.completions.create(
                 model="gpt-4",
                 messages=[
-                    {"role": "system", "content": "You are a QA expert specializing in test case generation."},
+                    {"role": "system", "content": "You are a QA expert specializing in test case generation. Generate detailed, well-structured test cases in markdown format."},
                     {"role": "user", "content": self._generate_test_case_prompt(element)}
                 ],
                 temperature=0.7,
-                max_tokens=1000
+                max_tokens=2000
             )
 
-            # Parse the response
-            test_case_data = response.choices[0].message.content
-            # Convert the string response to a dictionary
-            import json
-            test_case_dict = json.loads(test_case_data)
+            # Get the markdown content
+            test_case_markdown = response.choices[0].message.content
 
-            # Create TestCase object
+            # Create TestCase object with the markdown content
             return TestCase(
                 test_case_id=f"TC_{element.element_type}_{datetime.now().strftime('%Y%m%d%H%M%S')}",
-                test_case_title=test_case_dict["test_case_title"],
-                type=test_case_dict["type"],
-                priority=test_case_dict["priority"],
-                description=test_case_dict["description"],
-                preconditions=test_case_dict["preconditions"],
-                steps=[
-                    TestStep(
-                        step_number=step["step_number"],
-                        action=step["action"],
-                        expected_result=step["expected_result"]
-                    )
-                    for step in test_case_dict["steps"]
-                ],
+                test_case_title=test_case_markdown,  # Store the full markdown content
+                type="End-to-End",  # Default type
+                priority="High",    # Default priority
+                description=test_case_markdown,  # Store the full markdown content
+                preconditions=[],   # These will be in the markdown
+                steps=[],          # These will be in the markdown
                 related_element_id=element.element_id
             )
 

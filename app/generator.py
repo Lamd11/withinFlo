@@ -1,5 +1,5 @@
 from typing import List, Dict, Any
-from jinja2 import Environment, FileSystemLoader
+from jinja2 import Environment, FileSystemLoader, select_autoescape
 import os
 from .models import AnalysisResult, TestCase, UIElement
 import json
@@ -8,7 +8,10 @@ from datetime import datetime
 class DocumentationGenerator:
     def __init__(self):
         template_dir = os.path.join(os.path.dirname(__file__), "..", "templates")
-        self.env = Environment(loader=FileSystemLoader(template_dir))
+        self.env = Environment(
+            loader=FileSystemLoader(template_dir),
+            autoescape=select_autoescape(['html', 'xml', 'json'])
+        )
         
         # Create templates directory if it doesn't exist
         os.makedirs(template_dir, exist_ok=True)
@@ -21,29 +24,39 @@ class DocumentationGenerator:
         markdown_template = """# QA Test Documentation: {{ source_url }}
 **Analysis Date:** {{ analysis_timestamp }}
 
-## Page: {{ page_title }}
+## Page: {{ page_title or "Untitled" }}
 
 {% for test_case in generated_test_cases %}
-### Test Case ID: {{ test_case.test_case_id }}
-* **Title:** {{ test_case.test_case_title }}
-* **Type:** {{ test_case.type }}
-* **Priority:** {{ test_case.priority }}
-* **Description:** {{ test_case.description }}
-{% if test_case.preconditions %}
-* **Preconditions:**
-{% for precondition in test_case.preconditions %}
-    * {{ precondition }}
+{{ test_case.test_case_title }}
+
+---
+{% endfor %}
+
+## Identified UI Elements
+{% for element in identified_elements %}
+### Element ID: {{ element.element_id }}
+* **Type:** {{ element.element_type }}
+* **Selector:** `{{ element.selector }}`
+{% if element.visible_text %}
+* **Visible Text:** {{ element.visible_text }}
+{% endif %}
+{% if element.attributes %}
+* **Attributes:**
+{% for key, value in element.attributes.items() %}
+    * {{ key }}: `{{ value }}`
 {% endfor %}
 {% endif %}
-* **Steps:**
-{% for step in test_case.steps %}
-    {{ step.step_number }}. **Action:** {{ step.action }}
-        **Expected Result:** {{ step.expected_result }}
-{% endfor %}
+{% if element.position %}
+* **Position:**
+    * X: {{ element.position.x }}
+    * Y: {{ element.position.y }}
+    * Width: {{ element.position.width }}
+    * Height: {{ element.position.height }}
+{% endif %}
 
 {% endfor %}
 """
-        
+
         # Create JSON template
         json_template = """{
     "sourceUrl": "{{ source_url }}",
@@ -66,7 +79,8 @@ class DocumentationGenerator:
             source_url=result.source_url,
             analysis_timestamp=result.analysis_timestamp.isoformat(),
             page_title=result.page_title,
-            generated_test_cases=result.generated_test_cases
+            generated_test_cases=result.generated_test_cases,
+            identified_elements=[element.dict() for element in result.identified_elements]
         )
 
     def generate_json(self, result: AnalysisResult) -> Dict[str, Any]:
@@ -84,4 +98,4 @@ class DocumentationGenerator:
         return {
             "markdown": self.generate_markdown(result),
             "json": self.generate_json(result)
-        } 
+        }

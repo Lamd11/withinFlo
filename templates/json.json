@@ -1,0 +1,7 @@
+{
+    "sourceUrl": "{{ source_url }}",
+    "analysisTimestamp": "{{ analysis_timestamp }}",
+    "pageTitle": "{{ page_title }}",
+    "identifiedElements": {{ identified_elements | tojson }},
+    "generatedTestCases": {{ generated_test_cases | tojson }}
+}
