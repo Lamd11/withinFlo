@@ -1,0 +1,18 @@
+---
+description: This is the project's tech stack
+globs: 
+alwaysApply: false
+---
+# Technical Stack Rules for AI-Powered QA Documentation Generator
+- Backend Framework: Python with FastAPI
+- Browser Automation: Puppeteer
+- AI/ML Component: Large Language Model (LLM) API: GPT-4
+- Storage: MongoDB for flexible schema storage of UI elements and test cases; Redis for caching and rate-limiting
+- Queueing System: Redis with BullMQ or Celery for job queue management
+- Templating Engine: Jinja2 for Markdown generation
+- Deployment: Docker, Kubernetes for horizontal scaling of crawling and analysis workers
+- Standard logging with Python logging module; ELK Stack (Elasticsearch, Logstash, Kibana) for advanced logging (post-MVP)
+- Testing: Pytest for Python components; Jest for any Node.js components; aim for >75% code coverage
+- Security: API keys for authentication; JWT for future web UI; encryption for credentials at rest
+
+- Integration: JSON schema compatible with TestRail for direct API mapping
