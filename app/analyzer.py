@@ -4,15 +4,21 @@ from .models import UIElement, TestCase, TestStep
 import logging
 import os
 from datetime import datetime
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class TestCaseAnalyzer:
     def __init__(self):
-        openai.api_key = os.getenv("OPENAI_API_KEY")
-        if not openai.api_key:
+        # Load API key from environment
+        self.api_key = os.getenv("OPENAI_API_KEY")
+        if not self.api_key:
             raise ValueError("OPENAI_API_KEY environment variable is not set")
+        openai.api_key = self.api_key
 
     def _generate_test_case_prompt(self, element: UIElement) -> str:
         return f"""Given the following UI element, generate a comprehensive test case:
