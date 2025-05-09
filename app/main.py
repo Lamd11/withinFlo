@@ -4,6 +4,7 @@ from .worker import process_url, jobs_collection
 from datetime import datetime
 from bson import ObjectId
 import logging
+import asyncio
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
