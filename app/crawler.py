@@ -1,4 +1,4 @@
-from playwright.sync_api import sync_playwright
+from playwright.async_api import async_playwright
 from typing import List, Dict, Any
 import time
 from .models import UIElement, AuthConfig
@@ -9,31 +9,38 @@ logger = logging.getLogger(__name__)
 
 class WebsiteCrawler:
     def __init__(self):
-        self.playwright = sync_playwright().start()
-        self.browser = self.playwright.chromium.launch(headless=True)
+        self.playwright = None
+        self.browser = None
         
-    def __del__(self):
-        self.browser.close()
-        self.playwright.stop()
+    async def __aenter__(self):
+        self.playwright = await async_playwright().start()
+        self.browser = await self.playwright.chromium.launch(headless=True)
+        return self
+        
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        if self.browser:
+            await self.browser.close()
+        if self.playwright:
+            await self.playwright.stop()
 
-    def _apply_auth(self, page, auth: AuthConfig):
+    async def _apply_auth(self, page, auth: AuthConfig):
         if auth.type == "basic" and auth.username and auth.password:
-            page.set_http_credentials(auth.username, auth.password)
+            await page.set_http_credentials(auth.username, auth.password)
         elif auth.type == "session" and auth.token:
             if auth.token_type == "cookie":
-                page.context.add_cookies([{
+                await page.context.add_cookies([{
                     "name": "session",
                     "value": auth.token,
                     "url": page.url
                 }])
             elif auth.token_type == "bearer":
-                page.set_extra_http_headers({
+                await page.set_extra_http_headers({
                     "Authorization": f"Bearer {auth.token}"
                 })
 
-    def _extract_element_info(self, element) -> Dict[str, Any]:
+    async def _extract_element_info(self, element) -> Dict[str, Any]:
         try:
-            box = element.bounding_box()
+            box = await element.bounding_box()
             position = {
                 "x": box["x"],
                 "y": box["y"],
@@ -44,34 +51,34 @@ class WebsiteCrawler:
             position = None
 
         return {
-            "element_type": element.evaluate("el => el.tagName.toLowerCase()"),
-            "selector": self._generate_selector(element),
-            "attributes": element.evaluate("""el => {
+            "element_type": await element.evaluate("el => el.tagName.toLowerCase()"),
+            "selector": await self._generate_selector(element),
+            "attributes": await element.evaluate("""el => {
                 const attrs = {};
                 for (const attr of el.attributes) {
                     attrs[attr.name] = attr.value;
                 }
                 return attrs;
             }"""),
-            "visible_text": element.evaluate("el => el.textContent?.trim()"),
+            "visible_text": await element.evaluate("el => el.textContent?.trim()"),
             "position": position
         }
 
-    def _generate_selector(self, element) -> str:
+    async def _generate_selector(self, element) -> str:
         # Try to find a unique identifier
-        if element.get_attribute("id"):
-            return f"#{element.get_attribute('id')}"
+        if await element.get_attribute("id"):
+            return f"#{await element.get_attribute('id')}"
         
         # Try to use data-testid if available
-        if element.get_attribute("data-testid"):
-            return f"[data-testid='{element.get_attribute('data-testid')}']"
+        if await element.get_attribute("data-testid"):
+            return f"[data-testid='{await element.get_attribute('data-testid')}']"
         
         # Try to use name attribute
-        if element.get_attribute("name"):
-            return f"[name='{element.get_attribute('name')}']"
+        if await element.get_attribute("name"):
+            return f"[name='{await element.get_attribute('name')}']"
         
         # Fallback to a more complex selector
-        return element.evaluate("""el => {
+        return await element.evaluate("""el => {
             if (el.id) return '#' + el.id;
             if (el.getAttribute('data-testid')) return `[data-testid="${el.getAttribute('data-testid')}"]`;
             if (el.getAttribute('name')) return `[name="${el.getAttribute('name')}"]`;
@@ -97,23 +104,23 @@ class WebsiteCrawler:
             return path.join(' > ');
         }""")
 
-    def crawl(self, url: str, auth: AuthConfig = None) -> List[UIElement]:
+    async def crawl(self, url: str, auth: AuthConfig = None) -> List[UIElement]:
         logger.info(f"Starting crawl of {url}")
-        page = self.browser.new_page()
+        page = await self.browser.new_page()
         
         try:
             # Apply authentication if provided
             if auth:
-                self._apply_auth(page, auth)
+                await self._apply_auth(page, auth)
             
             # Navigate to the page
-            page.goto(url, wait_until="networkidle")
+            await page.goto(url, wait_until="networkidle")
             
             # Wait for dynamic content
-            time.sleep(5)  # Basic wait for dynamic content
+            await page.wait_for_timeout(5000)  # 5 seconds wait for dynamic content
             
             # Get page title
-            page_title = page.title()
+            page_title = await page.title()
             
             # Find all interactive elements
             elements = []
@@ -124,10 +131,10 @@ class WebsiteCrawler:
             ]
             
             for selector in selectors:
-                page_elements = page.query_selector_all(selector)
+                page_elements = await page.query_selector_all(selector)
                 for i, element in enumerate(page_elements):
                     try:
-                        element_info = self._extract_element_info(element)
+                        element_info = await self._extract_element_info(element)
                         elements.append(UIElement(
                             element_id=f"{element_info['element_type']}_{i}",
                             **element_info
@@ -143,4 +150,4 @@ class WebsiteCrawler:
             logger.error(f"Error crawling {url}: {str(e)}")
             raise
         finally:
-            page.close() 
+            await page.close() 

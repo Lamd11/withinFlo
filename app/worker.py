@@ -7,6 +7,7 @@ from datetime import datetime
 import os
 import logging
 from pymongo import MongoClient
+import asyncio
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -34,13 +35,22 @@ def process_url(job_id: str, url: str, auth: dict = None):
             }}
         )
 
+        # Create event loop for async operations
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+
         # Initialize components
-        crawler = WebsiteCrawler()
         analyzer = TestCaseAnalyzer()
         generator = DocumentationGenerator()
 
+        # Run async crawl
+        async def crawl_website():
+            async with WebsiteCrawler() as crawler:
+                return await crawler.crawl(url, auth)
+
         # Crawl the website
-        elements = crawler.crawl(url, auth)
+        elements = loop.run_until_complete(crawl_website())
+        loop.close()
 
         # Analyze elements and generate test cases
         test_cases = analyzer.analyze_elements(elements)
@@ -49,7 +59,7 @@ def process_url(job_id: str, url: str, auth: dict = None):
         result = AnalysisResult(
             source_url=url,
             analysis_timestamp=datetime.utcnow(),
-            page_title=crawler.page_title,
+            page_title="",  # This will be set by the crawler in a future update
             identified_elements=elements,
             generated_test_cases=test_cases
         )
