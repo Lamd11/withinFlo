@@ -1,4 +1,5 @@
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from .models import JobRequest, JobResponse, JobStatus
 from .worker import process_url, jobs_collection
 from datetime import datetime
@@ -12,6 +13,15 @@ logger = logging.getLogger(__name__)
 
 app = FastAPI(title="QA Documentation Generator",
              description="AI-powered tool for generating test documentation from website analysis")
+
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],  # Frontend URL
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 @app.post("/jobs", response_model=JobResponse)
 async def create_job(request: JobRequest):
