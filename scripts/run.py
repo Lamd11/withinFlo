@@ -5,6 +5,9 @@ from concurrent.futures import ThreadPoolExecutor
 import signal
 import time
 
+# Add parent directory to path so we can import app modules
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 def start_fastapi():
     print("Starting FastAPI server...")
     fastapi_process = subprocess.Popen(
@@ -12,7 +15,8 @@ def start_fastapi():
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         text=True,
-        bufsize=1
+        bufsize=1,
+        cwd=os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # Run from project root
     )
     return fastapi_process
 
@@ -23,7 +27,8 @@ def start_celery():
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         text=True,
-        bufsize=1
+        bufsize=1,
+        cwd=os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # Run from project root
     )
     return celery_process
 
@@ -47,8 +52,8 @@ def print_usage():
     print("  test     - Run the test script to analyze a website")
     print("  help     - Show this help message")
     print("\nExample:")
-    print("  python run.py start")
-    print("  python run.py test")
+    print("  python scripts/run.py start")
+    print("  python scripts/run.py test")
 
 def signal_handler(sig, frame):
     print("\nShutting down gracefully...")
@@ -65,6 +70,10 @@ if __name__ == "__main__":
     
     if command == "start":
         try:
+            # Ensure output directories exist
+            os.makedirs("output/json", exist_ok=True)
+            os.makedirs("output/markdown", exist_ok=True)
+            
             # Check for prerequisites
             if not os.getenv("OPENAI_API_KEY"):
                 print("WARNING: OPENAI_API_KEY environment variable is not set!")
@@ -95,53 +104,9 @@ if __name__ == "__main__":
             
     elif command == "test":
         try:
-            from test_qa_generator import test_qa_generator
-            import asyncio
-            
-            print("Starting test script...")
-            # Example usage - directly invoke the test script
-            test_url = input("Enter URL to analyze: ")
-            
-            # Optional: Ask for authentication
-            use_auth = input("Does the website require authentication? (y/n): ").lower() == 'y'
-            auth = None
-            
-            if use_auth:
-                auth_type = input("Auth type (basic/session): ").lower()
-                if auth_type == "basic":
-                    username = input("Username: ")
-                    password = input("Password: ")
-                    auth = {
-                        "type": "basic",
-                        "username": username,
-                        "password": password
-                    }
-                elif auth_type == "session":
-                    token = input("Session token: ")
-                    token_type = input("Token type (cookie/bearer): ").lower()
-                    auth = {
-                        "type": "session",
-                        "token": token,
-                        "token_type": token_type
-                    }
-            
-            # Optional: Ask for website context
-            use_context = input("Do you want to provide additional context about the website? (y/n): ").lower() == 'y'
-            website_context = None
-            
-            if use_context:
-                site_type = input("Website type (e.g., E-commerce, Blog, SaaS Dashboard): ")
-                page_description = input("Current page description: ")
-                user_goal = input("Main user goal on this page: ")
-                
-                website_context = {
-                    "type": site_type,
-                    "current_page_description": page_description,
-                    "user_goal_on_page": user_goal
-                }
-            
-            # Run the async function
-            asyncio.run(test_qa_generator(test_url, auth, website_context))
+            # Run the test script from current directory
+            script_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "test_qa_generator.py")
+            subprocess.run([sys.executable, script_path], check=True)
             
         except Exception as e:
             print(f"Error running test: {str(e)}")

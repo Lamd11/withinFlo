@@ -4,6 +4,7 @@ import json
 from datetime import datetime
 import asyncio
 import aiohttp
+import os
 
 async def test_qa_generator(url: str, auth=None, website_context=None):
     """
@@ -61,10 +62,14 @@ async def test_qa_generator(url: str, auth=None, website_context=None):
             response.raise_for_status()
             results = await response.json()
         
+        # Create output directories if they don't exist
+        os.makedirs("../output/markdown", exist_ok=True)
+        os.makedirs("../output/json", exist_ok=True)
+        
         # Save results
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        markdown_file = f"qa_documentation_{timestamp}.md"
-        json_file = f"qa_documentation_{timestamp}.json"
+        markdown_file = f"../output/markdown/qa_documentation_{timestamp}.md"
+        json_file = f"../output/json/qa_documentation_{timestamp}.json"
         
         with open(markdown_file, "w", encoding="utf-8") as f:
             f.write(results["markdown"])
