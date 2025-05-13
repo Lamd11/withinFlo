@@ -5,22 +5,32 @@ from datetime import datetime
 import asyncio
 import aiohttp
 
-async def test_qa_generator(url: str, auth=None):
+async def test_qa_generator(url: str, auth=None, website_context=None):
     """
     Test the QA Documentation Generator with a given URL.
     
     Args:
         url (str): The URL to analyze
         auth (dict, optional): Authentication configuration
+        website_context (dict, optional): Additional context about the website
     """
     base_url = "http://localhost:8000"
     
     async with aiohttp.ClientSession() as session:
         # Submit job
         print(f"\nSubmitting URL for analysis: {url}")
+        request_data = {
+            "url": url, 
+            "auth": auth
+        }
+        
+        if website_context:
+            request_data["website_context"] = website_context
+            print(f"With context: {json.dumps(website_context, indent=2)}")
+            
         async with session.post(
             f"{base_url}/jobs",
-            json={"url": url, "auth": auth}
+            json=request_data
         ) as response:
             response.raise_for_status()
             job_data = await response.json()
@@ -93,5 +103,20 @@ if __name__ == "__main__":
                 "token_type": token_type
             }
     
+    # Optional: Ask for website context
+    use_context = input("Do you want to provide additional context about the website? (y/n): ").lower() == 'y'
+    website_context = None
+    
+    if use_context:
+        site_type = input("Website type (e.g., E-commerce, Blog, SaaS Dashboard): ")
+        page_description = input("Current page description: ")
+        user_goal = input("Main user goal on this page: ")
+        
+        website_context = {
+            "type": site_type,
+            "current_page_description": page_description,
+            "user_goal_on_page": user_goal
+        }
+    
     # Run the async function
-    asyncio.run(test_qa_generator(test_url, auth)) 
+    asyncio.run(test_qa_generator(test_url, auth, website_context)) 

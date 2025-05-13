@@ -5,7 +5,7 @@ alwaysApply: false
 ---
 # Technical Stack Rules for AI-Powered QA Documentation Generator
 - Backend Framework: Python with FastAPI
-- Browser Automation: Puppeteer
+- Browser Automation: Playwright
 - AI/ML Component: Large Language Model (LLM) API: GPT-4
 - Storage: MongoDB for flexible schema storage of UI elements and test cases; Redis for caching and rate-limiting
 - Queueing System: Redis with BullMQ or Celery for job queue management

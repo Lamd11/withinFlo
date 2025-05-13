@@ -18,6 +18,7 @@ class AuthConfig(BaseModel):
 class JobRequest(BaseModel):
     url: HttpUrl
     auth: Optional[AuthConfig] = None
+    website_context: Optional[Dict[str, Any]] = None  # Added for custom context information
 
 class JobStatus(str, Enum):
     PENDING = "pending"
@@ -47,6 +48,7 @@ class TestCase(BaseModel):
     preconditions: List[str]
     steps: List[TestStep]
     related_element_id: Optional[str] = None
+    feature_tested: Optional[str] = None  # Added to match analyzer's parsing ability
 
 class AnalysisResult(BaseModel):
     source_url: str
@@ -54,6 +56,7 @@ class AnalysisResult(BaseModel):
     page_title: str
     identified_elements: List[UIElement]
     generated_test_cases: List[TestCase]
+    website_context: Optional[Dict[str, Any]] = None  # Added for context information
 
 class JobResponse(BaseModel):
     job_id: str

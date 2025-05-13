@@ -2,6 +2,9 @@
     "sourceUrl": "{{ source_url }}",
     "analysisTimestamp": "{{ analysis_timestamp }}",
     "pageTitle": "{{ page_title }}",
+    {% if website_context %}
+    "websiteContext": {{ website_context | tojson }},
+    {% endif %}
     "identifiedElements": {{ identified_elements | tojson }},
     "generatedTestCases": {{ generated_test_cases | tojson }}
 }

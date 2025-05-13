@@ -24,8 +24,11 @@ class WebsiteCrawler:
             await self.playwright.stop()
 
     async def _apply_auth(self, page, auth: AuthConfig):
+        if not auth:
+            return
+            
         if auth.type == "basic" and auth.username and auth.password:
-            await page.set_http_credentials(auth.username, auth.password)
+            await page.set_http_credentials({"username": auth.username, "password": auth.password})
         elif auth.type == "session" and auth.token:
             if auth.token_type == "cookie":
                 await page.context.add_cookies([{
@@ -104,14 +107,15 @@ class WebsiteCrawler:
             return path.join(' > ');
         }""")
 
-    async def crawl(self, url: str, auth: AuthConfig = None) -> List[UIElement]:
+    async def crawl(self, url: str, auth: dict = None) -> Dict[str, Any]:
         logger.info(f"Starting crawl of {url}")
         page = await self.browser.new_page()
         
         try:
             # Apply authentication if provided
             if auth:
-                await self._apply_auth(page, auth)
+                auth_config = AuthConfig(**auth) if isinstance(auth, dict) else auth
+                await self._apply_auth(page, auth_config)
             
             # Navigate to the page
             await page.goto(url, wait_until="networkidle")
@@ -121,13 +125,16 @@ class WebsiteCrawler:
             
             # Get page title
             page_title = await page.title()
+            logger.info(f"Page title: {page_title}")
             
             # Find all interactive elements
             elements = []
             selectors = [
                 "button", "input", "select", "textarea", "a[href]",
                 "form", "img[alt]", "h1, h2, h3, h4, h5, h6",
-                "[role='button']", "[role='link']", "[role='textbox']"
+                "[role='button']", "[role='link']", "[role='textbox']",
+                ".btn", ".button", "[type='submit']", "[type='button']",
+                ".card", ".product", ".item", ".nav-link", ".menu-item"
             ]
             
             for selector in selectors:
@@ -144,7 +151,12 @@ class WebsiteCrawler:
                         continue
             
             logger.info(f"Found {len(elements)} elements on {url}")
-            return elements
+            
+            # Return both elements and page title in a dictionary
+            return {
+                "elements": elements,
+                "page_title": page_title
+            }
             
         except Exception as e:
             logger.error(f"Error crawling {url}: {str(e)}")
