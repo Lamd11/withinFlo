@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 
 interface TestCase {
   id: string;
+  originalId?: string;
   feature: string;
   title: string;
   type: string;
@@ -47,79 +48,163 @@ export default function TestCaseViewer({ markdown }: TestCaseViewerProps) {
       const idMatch = section.match(/^(TC_[A-Z0-9_]+)/);
       const id = idMatch ? idMatch[1] : `Unknown-${i}`;
       
-      // Extract feature tested
-      const featureMatch = section.match(/\*\*Feature\s+Tested:\*\*\s*(.*?)(?=\n\*\*|\n$)/i);
+      // Add index to ensure uniqueness
+      const uniqueId = `${id}-${i}`;
+      
+      // Extract feature tested - improved regex to be more flexible
+      const featureMatch = section.match(/\*\*Feature(?:\s+Tested)?:\*\*\s*([\s\S]*?)(?=\n\*\*|\n$)/i);
       const feature = featureMatch ? featureMatch[1].trim() : '';
       
-      // Extract title
-      const titleMatch = section.match(/\*\*Title:\*\*\s*(.*?)(?=\n\*\*|\n$)/i);
+      // Extract title - improved regex
+      const titleMatch = section.match(/\*\*Title:\*\*\s*([\s\S]*?)(?=\n\*\*|\n$)/i);
       const title = titleMatch ? titleMatch[1].trim() : '';
       
-      // Extract type
-      const typeMatch = section.match(/\*\*Type:\*\*\s*(.*?)(?=\n\*\*|\n$)/i);
+      // Extract type - improved regex
+      const typeMatch = section.match(/\*\*Type:\*\*\s*([\s\S]*?)(?=\n\*\*|\n$)/i);
       const type = typeMatch ? typeMatch[1].trim() : '';
       
-      // Extract priority
-      const priorityMatch = section.match(/\*\*Priority:\*\*\s*(.*?)(?=\n\*\*|\n$)/i);
+      // Extract priority - improved regex
+      const priorityMatch = section.match(/\*\*Priority:\*\*\s*([\s\S]*?)(?=\n\*\*|\n$)/i);
       const priority = priorityMatch ? priorityMatch[1].trim() : '';
       
-      // Extract description
-      const descriptionMatch = section.match(/\*\*Description:\*\*\s*(.*?)(?=\n\*\*|\n$)/i);
-      const description = descriptionMatch ? descriptionMatch[1].trim() : '';
+      // Extract description - improved to capture multi-line descriptions
+      let description = '';
+      const descriptionMatch = section.match(/\*\*Description:\*\*\s*([\s\S]*?)(?=\n\*\*|\n$|$)/i);
+      if (descriptionMatch) {
+        // Get the full description text and trim it
+        description = descriptionMatch[1].trim();
+      }
       
-      // Extract primary element - replacing /is flag with multi-line approach
-      const primaryElementRegex = new RegExp("\\*\\*Primary\\s+Element\\s+Under\\s+Test:\\*\\*\\s*(.*?)(?=\\n\\*\\*|\\n$)", "i");
+      // Extract primary element - improved regex with more flexible matching
+      const primaryElementRegex = new RegExp("\\*\\*(?:Primary\\s+Element|Related\\s+Element|Element\\s+Under\\s+Test)(?:\\s+Under\\s+Test)?:\\*\\*\\s*([\s\S]*?)(?=\\n\\*\\*|\\n$|$)", "i");
       const primaryElementMatch = section.match(primaryElementRegex);
       let primaryElement;
       
       if (primaryElementMatch) {
-        const selectorMatch = primaryElementMatch[1].match(/Selector:\s*`([^`]+)`/i);
+        // Check for selector with backticks
+        const selectorMatch = primaryElementMatch[1].match(/`([^`]+)`/);
+        // Alternative format: just the selector without explanation
+        const simpleSelectorMatch = !selectorMatch && primaryElementMatch[1].trim();
+        
         const purposeMatch = primaryElementMatch[1].match(/Purpose:\s*(.*?)(?=\n|$)/i);
         
-        if (selectorMatch) {
+        if (selectorMatch || (simpleSelectorMatch && typeof simpleSelectorMatch === 'string')) {
           primaryElement = {
-            selector: selectorMatch[1],
+            selector: selectorMatch ? selectorMatch[1] : String(simpleSelectorMatch),
             purpose: purposeMatch ? purposeMatch[1].trim() : undefined
           };
         }
       }
       
-      // Extract steps - replacing /is flag with multi-line approach
-      const stepsRegex = new RegExp("\\*\\*Steps:\\*\\*\\s*(.*?)(?=\\n\\*\\*|\\n$)", "i");
+      // Extract steps - improved regex for multi-line matching with better pattern recognition
+      const stepsRegex = new RegExp("\\*\\*Steps:\\*\\*\\s*([\s\S]*?)(?=\\n\\*\\*|\\n$|$)", "i");
       const stepsMatch = section.match(stepsRegex);
-      let steps;
+      let steps = [];
       
       if (stepsMatch) {
-        const stepLines = stepsMatch[1].split(/\d+\.\s*\*\*Action:\*\*/i);
-        steps = [];
+        // Try to match numbered steps with action and expected result
+        const stepPattern = /(\d+)\.?\s*\*\*Action:\*\*([\s\S]*?)\*\*Expected\s+Result:\*\*([\s\S]*?)(?=\n\s*\d+\.?\s*\*\*Action:\*\*|\n\*\*|\n$|$)/gi;
+        let stepMatch;
         
-        for (let j = 1; j < stepLines.length; j++) {
-          // Replace /is flag with multi-line approach
-          const actionRegex = new RegExp("(.*?)(?=\\*\\*Expected\\s+Result:\\*\\*)", "i");
-          const actionMatch = stepLines[j].match(actionRegex);
-          
-          const resultRegex = new RegExp("\\*\\*Expected\\s+Result:\\*\\*\\s*(.*?)(?=\\n\\d+\\.|\\n$)", "i");
-          const resultMatch = stepLines[j].match(resultRegex);
-          
-          if (actionMatch && resultMatch) {
+        while ((stepMatch = stepPattern.exec(stepsMatch[1])) !== null) {
+          steps.push({
+            number: parseInt(stepMatch[1], 10),
+            action: stepMatch[2].trim(),
+            expectedResult: stepMatch[3].trim()
+          });
+        }
+        
+        // If no steps were found with the pattern above, try an alternative approach
+        if (steps.length === 0) {
+          // Look for numbered steps without the Action/Expected Result formatting
+          const simpleStepPattern = /(\d+)\.?\s*([\s\S]*?)(?=\n\s*\d+\.|\n\*\*|\n$|$)/gi;
+          while ((stepMatch = simpleStepPattern.exec(stepsMatch[1])) !== null) {
+            // For simple steps, we just use the entire step as the action
             steps.push({
-              number: j,
-              action: actionMatch[1].trim(),
-              expectedResult: resultMatch[1].trim()
+              number: parseInt(stepMatch[1], 10),
+              action: stepMatch[2].trim(),
+              expectedResult: "Not specified"
             });
+          }
+          
+          // If still no steps, try splitting by lines with numbers
+          if (steps.length === 0) {
+            const stepLines = stepsMatch[1].split(/\n\s*\d+\.\s*/);
+            
+            for (let j = 1; j < stepLines.length; j++) {
+              // Improved regex for multi-line matching
+              const actionRegex = new RegExp("([\s\S]*?)(?=\\*\\*Expected\\s+Result:\\*\\*|$)", "i");
+              const actionMatch = stepLines[j].match(actionRegex);
+              
+              const resultRegex = new RegExp("\\*\\*Expected\\s+Result:\\*\\*\\s*([\s\S]*?)(?=\\n\\s*\\d+\\.|\\n$|$)", "i");
+              const resultMatch = stepLines[j].match(resultRegex);
+              
+              if (actionMatch) {
+                steps.push({
+                  number: j,
+                  action: actionMatch[1].trim(),
+                  expectedResult: resultMatch ? resultMatch[1].trim() : "Not specified"
+                });
+              }
+            }
           }
         }
       }
       
+      // Extract preconditions - improved regex for multi-line matching
+      const preconditionsRegex = new RegExp("\\*\\*Preconditions:\\*\\*\\s*([\s\S]*?)(?=\\n\\*\\*|\\n$|$)", "i");
+      const preconditionsMatch = section.match(preconditionsRegex);
+      let preconditions: string[] = [];
+      
+      if (preconditionsMatch) {
+        // First try to split by bullet points or numbers
+        const preconditionItems = preconditionsMatch[1].split(/\n\s*[\*\-]\s*|\n\s*\d+\.\s*/);
+        preconditions = preconditionItems
+          .map(item => item.trim())
+          .filter(item => item.length > 0);
+          
+        // If no items found, use the entire text as a single precondition
+        if (preconditions.length === 0 && preconditionsMatch[1].trim()) {
+          preconditions = [preconditionsMatch[1].trim()];
+        }
+      }
+      
+      // Extract postconditions - similar to preconditions
+      const postconditionsRegex = new RegExp("\\*\\*Postconditions:\\*\\*\\s*([\s\S]*?)(?=\\n\\*\\*|\\n$|$)", "i");
+      const postconditionsMatch = section.match(postconditionsRegex);
+      let postconditions: string[] = [];
+      
+      if (postconditionsMatch) {
+        // First try to split by bullet points or numbers
+        const postconditionItems = postconditionsMatch[1].split(/\n\s*[\*\-]\s*|\n\s*\d+\.\s*/);
+        postconditions = postconditionItems
+          .map(item => item.trim())
+          .filter(item => item.length > 0);
+          
+        // If no items found, use the entire text as a single postcondition
+        if (postconditions.length === 0 && postconditionsMatch[1].trim()) {
+          postconditions = [postconditionsMatch[1].trim()];
+        }
+      }
+      
+      // Fallback values for empty fields
+      const finalTitle = title || `Test Case ${id}`;
+      const finalType = type || 'Functional';
+      const finalPriority = priority || 'Medium';
+      const finalFeature = feature || 'General Functionality';
+      
       testCases.push({
-        id,
-        feature,
-        title,
-        type,
-        priority,
+        id: uniqueId,
+        originalId: id,
+        feature: finalFeature,
+        title: finalTitle,
+        type: finalType,
+        priority: finalPriority,
         description,
         primaryElement,
-        steps
+        steps,
+        preconditions,
+        postconditions
       });
     }
     
@@ -267,17 +352,17 @@ export default function TestCaseViewer({ markdown }: TestCaseViewerProps) {
                 <div className="flex-1">
                   <div className="flex items-center space-x-2 mb-2">
                     <span className="text-xs font-medium px-2.5 py-0.5 rounded-full bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300">
-                      {testCase.id}
+                      {testCase.originalId || testCase.id}
                     </span>
                     <span className={`text-xs font-medium px-2.5 py-0.5 rounded-full ${getPriorityColor(testCase.priority)}`}>
-                      {testCase.priority}
+                      {testCase.priority || 'No Priority'}
                     </span>
                     <span className={`text-xs font-medium px-2.5 py-0.5 rounded-full ${getTypeColor(testCase.type)}`}>
-                      {testCase.type}
+                      {testCase.type || 'No Type'}
                     </span>
                   </div>
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{testCase.title}</h3>
-                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{testCase.feature}</p>
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{testCase.title || 'Untitled Test Case'}</h3>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{testCase.feature || 'No Feature'}</p>
                 </div>
                 <div className="mt-2 md:mt-0">
                   <svg 
@@ -297,19 +382,35 @@ export default function TestCaseViewer({ markdown }: TestCaseViewerProps) {
                   {/* Description */}
                   <div className="mb-4">
                     <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Description</h4>
-                    <p className="text-gray-600 dark:text-gray-400">{testCase.description}</p>
+                    <div className="bg-gray-50 dark:bg-gray-700 p-3 rounded-md">
+                      <p className="text-gray-600 dark:text-gray-400 whitespace-pre-wrap">{testCase.description || 'No description provided.'}</p>
+                    </div>
                   </div>
+                  
+                  {/* Preconditions */}
+                  {testCase.preconditions && testCase.preconditions.length > 0 && (
+                    <div className="mb-4">
+                      <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Preconditions</h4>
+                      <div className="bg-gray-50 dark:bg-gray-700 p-3 rounded-md">
+                        <ul className="list-disc list-inside text-gray-600 dark:text-gray-400 pl-2">
+                          {testCase.preconditions.map((precondition, index) => (
+                            <li key={index} className="mb-1 whitespace-pre-wrap">{precondition}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    </div>
+                  )}
                   
                   {/* Primary Element */}
                   {testCase.primaryElement && (
                     <div className="mb-4">
-                      <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Primary Element</h4>
+                      <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Element Under Test</h4>
                       <div className="bg-gray-50 dark:bg-gray-700 p-3 rounded-md">
                         <p className="text-sm font-mono text-gray-600 dark:text-gray-400">
                           Selector: <span className="text-indigo-600 dark:text-indigo-400">{testCase.primaryElement.selector}</span>
                         </p>
                         {testCase.primaryElement.purpose && (
-                          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1 whitespace-pre-wrap">
                             Purpose: {testCase.primaryElement.purpose}
                           </p>
                         )}
@@ -342,10 +443,10 @@ export default function TestCaseViewer({ markdown }: TestCaseViewerProps) {
                                 <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
                                   {step.number}
                                 </td>
-                                <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-300">
+                                <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-300 whitespace-pre-wrap">
                                   {step.action}
                                 </td>
-                                <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-300">
+                                <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-300 whitespace-pre-wrap">
                                   {step.expectedResult}
                                 </td>
                               </tr>
@@ -355,6 +456,42 @@ export default function TestCaseViewer({ markdown }: TestCaseViewerProps) {
                       </div>
                     </div>
                   )}
+                  
+                  {/* Postconditions */}
+                  {testCase.postconditions && testCase.postconditions.length > 0 && (
+                    <div className="mb-4">
+                      <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Postconditions</h4>
+                      <div className="bg-gray-50 dark:bg-gray-700 p-3 rounded-md">
+                        <ul className="list-disc list-inside text-gray-600 dark:text-gray-400 pl-2">
+                          {testCase.postconditions.map((postcondition, index) => (
+                            <li key={index} className="mb-1 whitespace-pre-wrap">{postcondition}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Debug View (Hidden by Default) */}
+                  <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
+                    <button 
+                      className="text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 flex items-center"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const rawMarkdownElement = document.getElementById(`raw-markdown-${testCase.id}`);
+                        if (rawMarkdownElement) {
+                          rawMarkdownElement.classList.toggle('hidden');
+                        }
+                      }}
+                    >
+                      <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      Debug: View Raw Markdown
+                    </button>
+                    <div id={`raw-markdown-${testCase.id}`} className="hidden mt-2 p-3 bg-gray-100 dark:bg-gray-900 rounded-md overflow-auto">
+                      <pre className="text-xs text-gray-500 dark:text-gray-500 whitespace-pre-wrap font-mono">{`### Test Case ID: ${testCase.originalId || testCase.id}`}</pre>
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
@@ -401,3 +538,5 @@ export default function TestCaseViewer({ markdown }: TestCaseViewerProps) {
     </div>
   );
 } 
+
+
