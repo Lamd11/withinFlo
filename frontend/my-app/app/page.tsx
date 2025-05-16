@@ -152,7 +152,7 @@ export default function Home() {
           <ResultsViewer 
             markdown={results.markdown} 
             json={results.json} 
-          />
+            />
         )}
         
         {error && (
