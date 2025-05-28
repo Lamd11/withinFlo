@@ -6,9 +6,17 @@ interface ProgressTrackerProps {
   status: 'pending' | 'processing' | 'completed' | 'failed';
   logs: string[];
   progress: number;
+  elementCount?: number;
+  processedElements?: number;
 }
 
-export default function ProgressTracker({ status, logs, progress }: ProgressTrackerProps) {
+export default function ProgressTracker({ 
+  status, 
+  logs, 
+  progress, 
+  elementCount = 0, 
+  processedElements = 0 
+}: ProgressTrackerProps) {
   const [showAdvanced, setShowAdvanced] = useState(false);
 
   const getStatusText = () => {
@@ -52,12 +60,24 @@ export default function ProgressTracker({ status, logs, progress }: ProgressTrac
         </div>
 
         {/* Progress bar */}
-        <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5 mb-4">
+        <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5 mb-2">
           <div 
             className="bg-indigo-600 h-2.5 rounded-full transition-all duration-300 ease-in-out"
             style={{ width: `${progress}%` }}
           ></div>
         </div>
+        
+        {/* Element progress counter */}
+        {status === 'processing' && elementCount > 0 && (
+          <div className="flex justify-between items-center mb-4">
+            <span className="text-sm text-gray-600 dark:text-gray-400">
+              Analyzing elements: {processedElements} of {elementCount}
+            </span>
+            <span className="text-sm font-medium text-indigo-600 dark:text-indigo-400">
+              {Math.round((processedElements / elementCount) * 100)}%
+            </span>
+          </div>
+        )}
 
         {/* Status steps */}
         <div className="flex justify-between mb-6">

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 
 interface UrlFormProps {
   onSubmit: (url: string, auth: any, context: any) => void;
@@ -11,6 +11,7 @@ export default function UrlForm({ onSubmit, isLoading }: UrlFormProps) {
   const [url, setUrl] = useState('');
   const [urlError, setUrlError] = useState('');
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const formRef = useRef<HTMLFormElement>(null);
   
   // Auth state
   const [useAuth, setUseAuth] = useState(false);
@@ -25,6 +26,28 @@ export default function UrlForm({ onSubmit, isLoading }: UrlFormProps) {
   const [siteType, setSiteType] = useState('');
   const [pageDescription, setPageDescription] = useState('');
   const [userGoal, setUserGoal] = useState('');
+
+  // Fix for handling clicks on show/hide advanced button
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      // Close advanced options if clicked outside
+      if (formRef.current && !formRef.current.contains(event.target as Node)) {
+        // Keep advanced open if it contains inputs with values
+        const hasValues = 
+          (useAuth && (username || password || token)) ||
+          (useContext && (siteType || pageDescription || userGoal));
+          
+        if (!hasValues) {
+          setShowAdvanced(false);
+        }
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [useAuth, username, password, token, useContext, siteType, pageDescription, userGoal]);
 
   const validateUrl = (value: string) => {
     if (!value) {
@@ -70,9 +93,23 @@ export default function UrlForm({ onSubmit, isLoading }: UrlFormProps) {
     onSubmit(url, auth, context);
   };
 
+  const handleAnalyzeClick = () => {
+    if (formRef.current) {
+      // Manually trigger form submission when the button is clicked
+      const submitEvent = new Event('submit', { cancelable: true, bubbles: true });
+      formRef.current.dispatchEvent(submitEvent);
+    }
+  };
+
+  const toggleAdvanced = (e: React.MouseEvent) => {
+    e.preventDefault(); // Prevent any default behavior
+    e.stopPropagation(); // Stop event propagation
+    setShowAdvanced(!showAdvanced);
+  };
+
   return (
     <div className="w-full max-w-2xl mx-auto bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <form ref={formRef} onSubmit={handleSubmit} className="space-y-6">
         <div>
           <label htmlFor="url" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
             Website URL to Analyze
@@ -102,7 +139,7 @@ export default function UrlForm({ onSubmit, isLoading }: UrlFormProps) {
         <div className="flex items-center">
           <button
             type="button"
-            onClick={() => setShowAdvanced(!showAdvanced)}
+            onClick={toggleAdvanced}
             className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 text-sm flex items-center"
           >
             {showAdvanced ? 'Hide' : 'Show'} Advanced Options
@@ -313,7 +350,8 @@ export default function UrlForm({ onSubmit, isLoading }: UrlFormProps) {
 
         <div className="flex justify-end">
           <button
-            type="submit"
+            type="button"
+            onClick={handleAnalyzeClick}
             disabled={isLoading}
             className={`px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 ${
               isLoading ? 'opacity-70 cursor-not-allowed' : ''
