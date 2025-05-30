@@ -19,6 +19,7 @@ class JobRequest(BaseModel):
     url: HttpUrl
     auth: Optional[AuthConfig] = None
     website_context: Optional[Dict[str, Any]] = None  # Added for custom context information
+    user_prompt: Optional[str] = None
 
 class JobStatus(str, Enum):
     PENDING = "pending"
@@ -65,3 +66,14 @@ class JobResponse(BaseModel):
     updated_at: datetime
     result: Optional[AnalysisResult] = None
     error: Optional[str] = None 
+
+class ScanStrategy(BaseModel):
+    strategy_id: str
+    strategy_name: str
+    strategy_description: str
+    strategy_type: str
+    strategy_parameters: Dict[str, Any]
+    created_at: datetime
+    updated_at: datetime
+    is_active: bool
+    is_default: bool
