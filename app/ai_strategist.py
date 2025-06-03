@@ -4,7 +4,7 @@ from typing import List, Dict, Any, Optional
 import logging
 import json
 from dotenv import load_dotenv
-from models import ScanStrategy
+from .models import ScanStrategy
 from pydantic import ValidationError
 
 

@@ -1,9 +1,10 @@
 from celery import Celery
+from typing import Optional
 from .crawler import WebsiteCrawler
 from .analyzer import TestCaseAnalyzer
 from .generator import DocumentationGenerator
 from .ai_strategist import AIStrategist
-from .models import AnalysisResult, JobStatus
+from .models import AnalysisResult, JobStatus, ScanStrategy
 from datetime import datetime
 import os
 import logging
@@ -40,11 +41,25 @@ def process_url(job_id: str, url: str, auth: dict = None, website_context: dict 
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
 
-        # Create ScanStrategy to send to analyzer afterwards
+        # Create ScanStrategy to send to crawler
 
         strategist = AIStrategist()
         strategist.develop_scan_strategy
 
+        scan_strategy_obj: Optional[ScanStrategy] = AIStrategist.develop_scan_strategy(
+            user_prompt=user_prompt,
+            url=url,
+            existing_website_context=website_context,
+        )
+
+        if not scan_strategy_obj:
+            logger.error(f"Job {job_id}: AI Strategist failed to develop a scan strategy.")
+            # Handle failure: update job to FAILED, store error, and return
+            jobs_collection.update_one(
+                {'_id': job_id},
+                {'$set': {'status': JobStatus.FAILED, 'updated_at': datetime.utcnow(), 'error': "Failed to generate scan strategy"}}
+        )
+        
         # Initialize components
         analyzer = TestCaseAnalyzer()
         generator = DocumentationGenerator()
