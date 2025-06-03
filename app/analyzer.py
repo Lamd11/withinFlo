@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 import re # For parsing
 
 # Load environment variables
-# load_dotenv() # Temporarily commented out
+load_dotenv() # Temporarily commented out
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
