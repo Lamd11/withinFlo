@@ -19,6 +19,7 @@ class JobRequest(BaseModel):
     url: HttpUrl
     auth: Optional[AuthConfig] = None
     website_context: Optional[Dict[str, Any]] = None  # Added for custom context information
+    user_prompt: Optional[str] = None
 
 class JobStatus(str, Enum):
     PENDING = "pending"
@@ -32,7 +33,7 @@ class UIElement(BaseModel):
     selector: str
     attributes: Dict[str, str]
     visible_text: Optional[str] = None
-    position: Optional[Dict[str, int]] = None
+    position: Optional[Dict[str, float]] = None
 
 class TestStep(BaseModel):
     step_number: int
@@ -65,3 +66,7 @@ class JobResponse(BaseModel):
     updated_at: datetime
     result: Optional[AnalysisResult] = None
     error: Optional[str] = None 
+
+class ScanStrategy(BaseModel):
+    focus_areas: List[str]
+    target_elements_description: List[Dict[str, Any]]

@@ -33,6 +33,7 @@ async def create_job(request: JobRequest):
             'url': str(request.url),
             'auth': request.auth.dict() if request.auth else None,
             'website_context': request.website_context,
+            'user_prompt': request.user_prompt,
             'status': JobStatus.PENDING,
             'created_at': datetime.utcnow(),
             'updated_at': datetime.utcnow()
@@ -44,7 +45,8 @@ async def create_job(request: JobRequest):
         # Start processing task
         process_url.delay(job_id, str(request.url), 
                           request.auth.dict() if request.auth else None,
-                          request.website_context)
+                          request.website_context,
+                          request.user_prompt)
         
         return JobResponse(
             job_id=job_id,
