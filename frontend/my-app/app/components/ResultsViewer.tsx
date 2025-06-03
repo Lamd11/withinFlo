@@ -9,9 +9,10 @@ import TestCaseViewer from './TestCaseViewer';
 interface ResultsViewerProps {
   markdown: string;
   json: any;
+  jobId: string;
 }
 
-export default function ResultsViewer({ markdown, json }: ResultsViewerProps) {
+export default function ResultsViewer({ markdown, json, jobId }: ResultsViewerProps) {
   const [activeTab, setActiveTab] = useState<'markdown' | 'json' | 'testcases'>('testcases');
 
   const downloadMarkdown = () => {
@@ -38,6 +39,30 @@ export default function ResultsViewer({ markdown, json }: ResultsViewerProps) {
     URL.revokeObjectURL(url);
   };
 
+  const downloadPDF = async () => {
+    if (!jobId) {
+      console.error("Job ID is not available, cannot download PDF.");
+      return;
+    }
+    try {
+      const response = await fetch(`/api/jobs/${jobId}/results/pdf`);
+      if (!response.ok) {
+        throw new Error(`Failed to download PDF: ${response.statusText}`);
+      }
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `qa_documentation_${jobId}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error("Error downloading PDF:", error);
+    }
+  };
+
   return (
     <div className="w-full max-w-6xl mx-auto bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mt-8">
       <div className="flex items-center justify-between mb-6">
@@ -61,6 +86,15 @@ export default function ResultsViewer({ markdown, json }: ResultsViewerProps) {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
             </svg>
             Download JSON
+          </button>
+          <button
+            onClick={downloadPDF}
+            className="px-3 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 flex items-center"
+          >
+            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
+            Download PDF
           </button>
         </div>
       </div>

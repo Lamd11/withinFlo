@@ -148,10 +148,11 @@ export default function Home() {
           />
         )}
         
-        {results && (
+        {results && jobId && (
           <ResultsViewer 
             markdown={results.markdown} 
             json={results.json} 
+            jobId={jobId}
             />
         )}
         

@@ -1,11 +1,14 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from .models import JobRequest, JobResponse, JobStatus
+from fastapi.responses import StreamingResponse
+from .models import JobRequest, JobResponse, JobStatus, AnalysisResult
 from .worker import process_url, jobs_collection
+from .generator import DocumentationGenerator
 from datetime import datetime
 from bson import ObjectId
 import logging
 import asyncio
+import io
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -95,4 +98,35 @@ async def get_job_results(job_id: str):
         raise
     except Exception as e:
         logger.error(f"Error getting job results: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/jobs/{job_id}/results/pdf")
+async def get_job_results_pdf(job_id: str):
+    try:
+        job = jobs_collection.find_one({'_id': job_id})
+        if not job:
+            raise HTTPException(status_code=404, detail="Job not found")
+            
+        if job['status'] != JobStatus.COMPLETED:
+            raise HTTPException(status_code=400, detail="Job is not completed or has failed")
+            
+        analysis_result_data = job.get('result')
+        if not analysis_result_data:
+            raise HTTPException(status_code=404, detail="Analysis result data not found for this job")
+
+        analysis_result = AnalysisResult(**analysis_result_data)
+
+        doc_generator = DocumentationGenerator()
+        pdf_bytes = doc_generator.generate_pdf(analysis_result)
+
+        return StreamingResponse(
+            io.BytesIO(pdf_bytes),
+            media_type="application/pdf",
+            headers={ "Content-Disposition": f"attachment; filename=qa_documentation_{job_id}.pdf" }
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting job PDF result: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e)) 

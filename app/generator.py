@@ -4,6 +4,8 @@ import os
 from .models import AnalysisResult, TestCase, UIElement
 import json
 from datetime import datetime
+import io # Added for in-memory PDF generation
+from markdown_pdf import MarkdownPdf, Section # Added for PDF generation
 
 class DocumentationGenerator:
     def __init__(self):
@@ -108,8 +110,24 @@ class DocumentationGenerator:
         )
         return json.loads(json_str)
 
+    def generate_pdf(self, result: AnalysisResult) -> bytes:
+        markdown_content = self.generate_markdown(result)
+        
+        pdf_doc = MarkdownPdf(toc_level=2)
+        pdf_doc.add_section(Section(markdown_content, toc=True))
+        
+        # Save PDF to an in-memory bytes buffer
+        buffer = io.BytesIO()
+        pdf_doc.save(buffer)
+        buffer.seek(0)
+        pdf_bytes = buffer.read()
+        buffer.close()
+        return pdf_bytes
+
     def generate_documentation(self, result: AnalysisResult) -> Dict[str, Any]:
+        # PDF will be generated on-demand by the dedicated PDF endpoint
         return {
             "markdown": self.generate_markdown(result),
             "json": self.generate_json(result)
+            # "pdf" key is removed from here
         }
