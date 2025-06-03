@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 import re # For parsing
 
 # Load environment variables
-load_dotenv()
+# load_dotenv() # Temporarily commented out
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -17,8 +17,8 @@ class TestCaseAnalyzer:
     def __init__(self):
         self.api_key = os.getenv("OPENAI_API_KEY")
         if not self.api_key:
-            logger.error("OPENAI_API_KEY environment variable is not set.")
-            raise ValueError("OPENAI_API_KEY environment variable is not set")
+            logger.error("OPENAI_API_KEY environment variable is not set. (load_dotenv is commented out)")
+            raise ValueError("OPENAI_API_KEY environment variable is not set. (load_dotenv is commented out)")
         self.client = OpenAI(api_key=self.api_key)
 
     def _generate_test_case_prompt(self, element: UIElement, website_context: Dict[str, Any] = None) -> str:
