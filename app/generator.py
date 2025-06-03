@@ -7,6 +7,9 @@ from datetime import datetime
 import io # Added for in-memory PDF generation
 from markdown_pdf import MarkdownPdf, Section # Added for PDF generation
 
+# Path to the CSS file
+PDF_STYLES_PATH = os.path.join(os.path.dirname(__file__), "static", "pdf_styles.css")
+
 class DocumentationGenerator:
     def __init__(self):
         template_dir = os.path.join(os.path.dirname(__file__), "..", "templates")
@@ -114,7 +117,19 @@ class DocumentationGenerator:
         markdown_content = self.generate_markdown(result)
         
         pdf_doc = MarkdownPdf(toc_level=2)
-        pdf_doc.add_section(Section(markdown_content, toc=True))
+
+        # Read custom CSS
+        user_css = ""
+        try:
+            with open(PDF_STYLES_PATH, 'r') as f:
+                user_css = f.read()
+        except FileNotFoundError:
+            # Handle case where CSS file might be missing, or log a warning
+            print(f"Warning: CSS file not found at {PDF_STYLES_PATH}")
+        except Exception as e:
+            print(f"Warning: Error reading CSS file at {PDF_STYLES_PATH}: {e}")
+
+        pdf_doc.add_section(Section(markdown_content, toc=True), user_css=user_css)
         
         # Save PDF to an in-memory bytes buffer
         buffer = io.BytesIO()
