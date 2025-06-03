@@ -2,6 +2,7 @@ from celery import Celery
 from .crawler import WebsiteCrawler
 from .analyzer import TestCaseAnalyzer
 from .generator import DocumentationGenerator
+from .ai_strategist import AIStrategist
 from .models import AnalysisResult, JobStatus
 from datetime import datetime
 import os
@@ -24,7 +25,7 @@ db = mongo_client['qa_doc_generator']
 jobs_collection = db['jobs']
 
 @celery_app.task
-def process_url(job_id: str, url: str, auth: dict = None, website_context: dict = None):
+def process_url(job_id: str, url: str, auth: dict = None, website_context: dict = None, user_prompt: str = None):
     try:
         # Update job status to processing
         jobs_collection.update_one(
@@ -38,6 +39,11 @@ def process_url(job_id: str, url: str, auth: dict = None, website_context: dict 
         # Create event loop for async operations
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
+
+        # Create ScanStrategy to send to analyzer afterwards
+
+        strategist = AIStrategist()
+        strategist.develop_scan_strategy
 
         # Initialize components
         analyzer = TestCaseAnalyzer()

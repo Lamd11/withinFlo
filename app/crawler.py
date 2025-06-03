@@ -1,7 +1,6 @@
 from playwright.async_api import async_playwright
 from typing import List, Dict, Any
-import time
-from .models import UIElement, AuthConfig, ScanStrategy
+from models import UIElement, AuthConfig, ScanStrategy
 import logging
 
 logging.basicConfig(level=logging.INFO)
