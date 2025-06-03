@@ -1,7 +1,7 @@
 from playwright.async_api import async_playwright
 from typing import List, Dict, Any
 import time
-from .models import UIElement, AuthConfig
+from .models import UIElement, AuthConfig, ScanStrategy
 import logging
 
 logging.basicConfig(level=logging.INFO)
@@ -106,8 +106,13 @@ class WebsiteCrawler:
             }
             return path.join(' > ');
         }""")
+    
 
-    async def crawl(self, url: str, auth: dict = None) -> Dict[str, Any]:
+
+    async def crawl(self, url: str, strategy: ScanStrategy, auth: dict = None) -> Dict[str, Any]:
+
+        if not strategy:
+            logger.warning("No strategy provided. Cannot scan")
         logger.info(f"Starting crawl of {url}")
         page = await self.browser.new_page()
         
@@ -129,26 +134,55 @@ class WebsiteCrawler:
             
             # Find all interactive elements
             elements = []
-            selectors = [
-                "button", "input", "select", "textarea", "a[href]",
-                "form", "img[alt]", "h1, h2, h3, h4, h5, h6",
-                "[role='button']", "[role='link']", "[role='textbox']",
-                ".btn", ".button", "[type='submit']", "[type='button']",
-                ".card", ".product", ".item", ".nav-link", ".menu-item"
-            ]
             
-            for selector in selectors:
-                page_elements = await page.query_selector_all(selector)
-                for i, element in enumerate(page_elements):
-                    try:
-                        element_info = await self._extract_element_info(element)
-                        elements.append(UIElement(
-                            element_id=f"{element_info['element_type']}_{i}",
-                            **element_info
-                        ))
-                    except Exception as e:
-                        logger.warning(f"Failed to extract element info: {str(e)}")
-                        continue
+            for desc in strategy.target_elements_description:
+                try:
+                    # Building selector based on the element's description
+                    tag_type = desc.get('type', '*')
+                    attributes = desc.get('attributes', {})
+                    text_contains = desc.get('text_contains', '')
+                    purpose = desc.get('purpose', '')
+
+                    # Build Attribute selector strings
+                    attr_selector = []
+                    for attr_name, attr_value in attributes.items():
+                        if attr_value == '*': # Handles wild card values
+                            attr_selector.append(f'[{attr_name}]')
+                        else: # Handles specific attribute values and can escape double quotes
+                            escaped_value = str(attr_value).replace('"', '\\"')
+                            attr_selector.append(f'[{attr_name}="{escaped_value}"]')
+                    attr_selector_string = ''.join(attr_selector)
+                    base_css_selector = f"{tag_type}{''.join(attr_selector)}"
+
+                    logger.info(f"Searching for elements with selector: {base_css_selector}")
+                    
+                    locator = page.locator(base_css_selector)
+                    # Filtering if specified
+                    if text_contains:
+                        locator = locator.filter(has_text=text_contains)
+                    
+                    # Using locator all does not wait until everything is dynamically loaded
+                    # May need to edit this in the future
+                    found_elements = await locator.all()
+
+                    # Processing elements
+                    for i, element in enumerate(found_elements):
+                        try:
+                            element_info = await self._extract_element_info(element)
+                            purpose_slug = purpose.lower().replace(' ', '_')[:30]
+
+                            elements.append(UIElement(
+                                element_id=f"{element_info['element_type']}_{purpose_slug}_{i}",
+                                **element_info
+                            ))
+                            logger.info(f"Found matching element for purpose: {purpose}")
+                        except Exception as extract_err:
+                            logger.warning(f"Failed to extract element info: {extract_err}")
+                            continue
+                    
+                except Exception as e:
+                    logger.error(f"Error processing element description {e}")
+                    continue
             
             logger.info(f"Found {len(elements)} elements on {url}")
             

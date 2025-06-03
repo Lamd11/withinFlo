@@ -33,7 +33,7 @@ class UIElement(BaseModel):
     selector: str
     attributes: Dict[str, str]
     visible_text: Optional[str] = None
-    position: Optional[Dict[str, int]] = None
+    position: Optional[Dict[str, float]] = None
 
 class TestStep(BaseModel):
     step_number: int
@@ -68,12 +68,5 @@ class JobResponse(BaseModel):
     error: Optional[str] = None 
 
 class ScanStrategy(BaseModel):
-    strategy_id: str
-    strategy_name: str
-    strategy_description: str
-    strategy_type: str
-    strategy_parameters: Dict[str, Any]
-    created_at: datetime
-    updated_at: datetime
-    is_active: bool
-    is_default: bool
+    focus_areas: List[str]
+    target_elements_description: List[Dict[str, Any]]
