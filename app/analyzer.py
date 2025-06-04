@@ -54,8 +54,7 @@ Think about what a user would be trying to achieve by interacting with this elem
 4.  **Related Elements:** If the flow involves other crucial elements for actions or verification, list their selectors and purpose.
 5.  **Preconditions:** List specific conditions that must be true *before* starting the test steps.
 6.  **Actionable Steps:** Write clear, sequential steps. Each step must include an "Action" and an "Expected Result."
-7.  **Postconditions:** Describe the state of the system *after* the test steps are successfully executed.
-8.  **Placeholder Data:** Use bracketed placeholders for dynamic data (e.g., `[Valid Username]`, `[Product Name]`, `[Test Item Price]`).
+7.  **Placeholder Data:** Use bracketed placeholders for dynamic data (e.g., `[Valid Username]`, `[Product Name]`, `[Test Item Price]`).
 
 **Output Format (Strict Markdown):**
 
@@ -65,9 +64,6 @@ Think about what a user would be trying to achieve by interacting with this elem
 * **Type:** [End-to-End | Functional | Usability | Edge Case | Scenario-Based]
 * **Priority:** [High | Medium | Low]
 * **Description:** [Clear, concise description of the test case's objective and the user flow it covers.]
-* **Related Elements (if applicable for the flow):**
-    * `[selector_for_related_element_1]` - [Purpose, e.g., Cart icon to verify item count update]
-    * `[selector_for_related_element_2]` - [Purpose, e.g., Confirmation message display]
 * **Preconditions:**
     * The user is on the [Page Name/URL where the primary element is located].
     * [e.g., At least one product is available for purchase.]
