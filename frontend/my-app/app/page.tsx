@@ -55,7 +55,7 @@ export default function Home() {
     setLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] ${message}`]);
   };
 
-  const handleSubmit = async (url: string, auth: any, context: any) => {
+  const handleSubmit = async (url: string, auth: any, context: any, userPrompt: string) => {
     setIsLoading(true);
     setJobId(null);
     setStatus('pending');
@@ -72,7 +72,8 @@ export default function Home() {
       console.log('Request body:', JSON.stringify({
         url,
         auth,
-        website_context: context
+        website_context: context,
+        user_prompt: userPrompt
       }));
       
       const response = await fetch('http://localhost:8000/jobs', {
@@ -83,7 +84,8 @@ export default function Home() {
         body: JSON.stringify({
           url,
           auth,
-          website_context: context
+          website_context: context,
+          user_prompt: userPrompt
         }),
       });
       

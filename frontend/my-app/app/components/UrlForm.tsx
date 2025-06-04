@@ -3,13 +3,15 @@
 import React, { useState } from 'react';
 
 interface UrlFormProps {
-  onSubmit: (url: string, auth: any, context: any) => void;
+  onSubmit: (url: string, auth: any, context: any, userPrompt: string) => void;
   isLoading: boolean;
 }
 
 export default function UrlForm({ onSubmit, isLoading }: UrlFormProps) {
   const [url, setUrl] = useState('');
   const [urlError, setUrlError] = useState('');
+  const [userPrompt, setUserPrompt] = useState('');
+  const [userPromptError, setUserPromptError] = useState('');
   const [showAdvanced, setShowAdvanced] = useState(false);
   
   // Auth state
@@ -42,10 +44,22 @@ export default function UrlForm({ onSubmit, isLoading }: UrlFormProps) {
     }
   };
 
+  const validateUserPrompt = (value: string) => {
+    if (!value.trim()) {
+      setUserPromptError('Please provide instructions for what to test');
+      return false;
+    }
+    setUserPromptError('');
+    return true;
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!validateUrl(url) || isLoading) return;
+    const isUrlValid = validateUrl(url);
+    const isPromptValid = validateUserPrompt(userPrompt);
+    
+    if (!isUrlValid || !isPromptValid || isLoading) return;
     
     // Prepare auth object
     let auth = null;
@@ -67,7 +81,7 @@ export default function UrlForm({ onSubmit, isLoading }: UrlFormProps) {
       };
     }
     
-    onSubmit(url, auth, context);
+    onSubmit(url, auth, context, userPrompt);
   };
 
   return (
@@ -95,6 +109,32 @@ export default function UrlForm({ onSubmit, isLoading }: UrlFormProps) {
             />
             {urlError && (
               <div className="text-red-500 text-sm mt-1">{urlError}</div>
+            )}
+          </div>
+        </div>
+
+        <div>
+          <label htmlFor="userPrompt" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            What would you like to test? *
+          </label>
+          <div className="mt-1 relative rounded-md shadow-sm">
+            <input
+              type="text"
+              id="userPrompt"
+              name="userPrompt"
+              value={userPrompt}
+              onChange={(e) => {
+                setUserPrompt(e.target.value);
+                if (userPromptError) validateUserPrompt(e.target.value);
+              }}
+              placeholder="e.g., Test the login form, Verify navigation menu links"
+              className={`block w-full px-4 py-3 rounded-md border ${
+                userPromptError ? 'border-red-300 text-red-900' : 'border-gray-300 dark:border-gray-600'
+              } focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:text-white`}
+              disabled={isLoading}
+            />
+            {userPromptError && (
+              <div className="text-red-500 text-sm mt-1">{userPromptError}</div>
             )}
           </div>
         </div>

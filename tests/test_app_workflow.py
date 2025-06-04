@@ -7,6 +7,7 @@ from app.crawler import WebsiteCrawler
 from app.analyzer import TestCaseAnalyzer
 from app.generator import DocumentationGenerator
 from app.models import AnalysisResult, JobStatus, ScanStrategy
+from datetime import datetime
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -22,7 +23,7 @@ async def test_full_workflow():
     """
     # Test URL
     url = "https://github.com"
-    user_prompt = "Find navigation elements, forms, and interactive buttons on the page"
+    user_prompt = "Find navigation elements and make test cases for them"
 
     try:
         # Step 1: Generate scan strategy
@@ -68,7 +69,8 @@ async def test_full_workflow():
             page_title=page_title,
             identified_elements=elements,
             generated_test_cases=test_cases,
-            website_context={"page_type": "homepage"}
+            website_context={"page_type": "homepage"},
+            analysis_timestamp=datetime.utcnow()
         )
         documentation = generator.generate_documentation(result)
         logger.info("Documentation generated successfully")
