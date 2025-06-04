@@ -41,17 +41,36 @@ def process_url(job_id: str, url: str, auth: dict = None, website_context: dict 
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
 
-        # Create ScanStrategy to send to crawler
+        # Initialize components
         strategist = AIStrategist()
+        analyzer = TestCaseAnalyzer()
+        generator = DocumentationGenerator()
+
+        # First, get initial website content
+        async def get_website_content():
+            async with WebsiteCrawler() as crawler:
+                content = await crawler.get_initial_content(url, auth)
+                return content
+
+        # Get initial website content
+        website_content = loop.run_until_complete(get_website_content())
+        
+        # Update website context with page title if available
+        if website_context is None:
+            website_context = {}
+        if website_content.get('page_title') and 'current_page_description' not in website_context:
+            website_context['current_page_description'] = website_content['page_title']
+
+        # Create ScanStrategy using the website content
         scan_strategy_obj: Optional[ScanStrategy] = strategist.develop_scan_strategy(
             user_prompt=user_prompt,
             url=url,
+            website_content=website_content,
             existing_website_context=website_context,
         )
 
         if not scan_strategy_obj:
             logger.error(f"Job {job_id}: AI Strategist failed to develop a scan strategy.")
-            # Handle failure: update job to FAILED, store error, and return
             jobs_collection.update_one(
                 {'_id': job_id},
                 {'$set': {
@@ -62,30 +81,17 @@ def process_url(job_id: str, url: str, auth: dict = None, website_context: dict 
             )
             return
 
-        # Initialize components
-        analyzer = TestCaseAnalyzer()
-        generator = DocumentationGenerator()
-
-        # Run async crawl
+        # Run targeted crawl with the strategy
         async def crawl_website():
             async with WebsiteCrawler() as crawler:
                 page_details = await crawler.crawl(url, scan_strategy_obj, auth)
                 return page_details
 
-        # Crawl the website
+        # Crawl the website with the strategy
         crawl_result = loop.run_until_complete(crawl_website())
         elements = crawl_result['elements']
         page_title = crawl_result['page_title']
         loop.close()
-
-        # Update website context with page title if available
-        if website_context is None:
-            website_context = {}
-        
-        if page_title and 'current_page_description' not in website_context:
-            website_context['current_page_description'] = page_title
-            
-        logger.info(f"Processing {len(elements)} elements with context: {website_context}")
 
         # Analyze elements and generate test cases
         test_cases = analyzer.analyze_elements(elements, website_context)

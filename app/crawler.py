@@ -106,7 +106,78 @@ class WebsiteCrawler:
             return path.join(' > ');
         }""")
     
-
+    async def get_initial_content(self, url: str, auth: dict = None) -> Dict[str, Any]:
+        """
+        Get initial content from the website before creating a scan strategy.
+        This includes visible text content, page title, and basic structure.
+        """
+        logger.info(f"Getting initial content from {url}")
+        page = await self.browser.new_page()
+        
+        try:
+            # Apply authentication if provided
+            if auth:
+                auth_config = AuthConfig(**auth) if isinstance(auth, dict) else auth
+                await self._apply_auth(page, auth_config)
+            
+            # Navigate to the page
+            await page.goto(url, wait_until="networkidle")
+            
+            # Wait for dynamic content
+            await page.wait_for_timeout(5000)  # 5 seconds wait for dynamic content
+            
+            # Get page title
+            page_title = await page.title()
+            
+            # Get visible text content
+            text_content = await page.evaluate('''() => {
+                const walker = document.createTreeWalker(
+                    document.body,
+                    NodeFilter.SHOW_TEXT,
+                    null,
+                    false
+                );
+                
+                let text = [];
+                let node;
+                
+                while(node = walker.nextNode()) {
+                    const trimmed = node.textContent.trim();
+                    if (trimmed) {
+                        text.push(trimmed);
+                    }
+                }
+                
+                return text.join(" ");
+            }''')
+            
+            # Get basic page structure (headings and main sections)
+            structure = await page.evaluate('''() => {
+                const headings = Array.from(document.querySelectorAll('h1, h2, h3')).map(h => ({
+                    level: h.tagName.toLowerCase(),
+                    text: h.textContent.trim()
+                }));
+                
+                const mainSections = Array.from(document.querySelectorAll('main, section, article, nav, header, footer')).map(section => ({
+                    type: section.tagName.toLowerCase(),
+                    id: section.id || '',
+                    class: section.className || ''
+                }));
+                
+                return { headings, mainSections };
+            }''')
+            
+            return {
+                "page_title": page_title,
+                "text_content": text_content,
+                "structure": structure
+            }
+            
+        except Exception as e:
+            logger.error(f"Error getting initial content from {url}: {str(e)}")
+            raise
+        finally:
+            await page.close()
 
     async def crawl(self, url: str, strategy: ScanStrategy, auth: dict = None) -> Dict[str, Any]:
 
