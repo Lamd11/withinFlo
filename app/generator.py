@@ -4,6 +4,11 @@ import os
 from .models import AnalysisResult, TestCase, UIElement
 import json
 from datetime import datetime
+import io # Added for in-memory PDF generation
+from markdown_pdf import MarkdownPdf, Section # Added for PDF generation
+
+# Path to the CSS file
+PDF_STYLES_PATH = os.path.join(os.path.dirname(__file__), "static", "pdf_styles.css")
 
 class DocumentationGenerator:
     def __init__(self):
@@ -38,32 +43,8 @@ class DocumentationGenerator:
 {% for test_case in generated_test_cases %}
 {{ test_case.description }}
 
----
 {% endfor %}
 
-## Identified UI Elements
-{% for element in identified_elements %}
-### Element ID: {{ element.element_id }}
-* **Type:** {{ element.element_type }}
-* **Selector:** `{{ element.selector }}`
-{% if element.visible_text %}
-* **Visible Text:** {{ element.visible_text }}
-{% endif %}
-{% if element.attributes %}
-* **Attributes:**
-{% for key, value in element.attributes.items() %}
-    * {{ key }}: `{{ value }}`
-{% endfor %}
-{% endif %}
-{% if element.position %}
-* **Position:**
-    * X: {{ element.position.x }}
-    * Y: {{ element.position.y }}
-    * Width: {{ element.position.width }}
-    * Height: {{ element.position.height }}
-{% endif %}
-
-{% endfor %}
 """
 
         # Create JSON template
@@ -108,8 +89,36 @@ class DocumentationGenerator:
         )
         return json.loads(json_str)
 
+    def generate_pdf(self, result: AnalysisResult) -> bytes:
+        markdown_content = self.generate_markdown(result)
+        
+        pdf_doc = MarkdownPdf(toc_level=2)
+
+        # Read custom CSS
+        user_css = ""
+        try:
+            with open(PDF_STYLES_PATH, 'r') as f:
+                user_css = f.read()
+        except FileNotFoundError:
+            # Handle case where CSS file might be missing, or log a warning
+            print(f"Warning: CSS file not found at {PDF_STYLES_PATH}")
+        except Exception as e:
+            print(f"Warning: Error reading CSS file at {PDF_STYLES_PATH}: {e}")
+
+        pdf_doc.add_section(Section(markdown_content, toc=True), user_css=user_css)
+        
+        # Save PDF to an in-memory bytes buffer
+        buffer = io.BytesIO()
+        pdf_doc.save(buffer)
+        buffer.seek(0)
+        pdf_bytes = buffer.read()
+        buffer.close()
+        return pdf_bytes
+
     def generate_documentation(self, result: AnalysisResult) -> Dict[str, Any]:
+        # PDF will be generated on-demand by the dedicated PDF endpoint
         return {
             "markdown": self.generate_markdown(result),
             "json": self.generate_json(result)
+            # "pdf" key is removed from here
         }

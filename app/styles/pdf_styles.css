@@ -1,0 +1,82 @@
+body {
+    font-family: Arial, sans-serif;
+    line-height: 1.6;
+    margin: 30px; /* Page margins */
+    color: #333;
+}
+
+h1, h2, h3 {
+    font-weight: bold;
+    margin-top: 1.5em;
+    margin-bottom: 0.5em;
+}
+
+h1 {
+    font-size: 24pt;
+    color: #2c3e50; /* Dark blue */
+    border-bottom: 2px solid #3498db; /* Blue underline */
+    padding-bottom: 0.3em;
+}
+
+h2 {
+    font-size: 18pt;
+    color: #3498db; /* Blue */
+}
+
+h3 {
+    font-size: 14pt;
+    color: #555;
+}
+
+p, li {
+    font-size: 11pt;
+    margin-bottom: 0.5em;
+    text-align: justify;
+}
+
+ul, ol {
+    padding-left: 20px;
+}
+
+pre {
+    background-color: #f4f4f4;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 10px;
+    font-size: 9pt;
+    overflow-x: auto; /* Allow horizontal scrolling for long code lines */
+    white-space: pre-wrap; /* Wrap long lines in code blocks */
+    word-wrap: break-word; /* Break words if necessary */
+}
+
+code { /* Inline code */
+    background-color: #f0f0f0;
+    padding: 2px 4px;
+    border-radius: 3px;
+    font-size: 90%;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 1em;
+    font-size: 10pt;
+}
+
+th, td {
+    border: 1px solid #ddd;
+    padding: 8px;
+    text-align: left;
+}
+
+th {
+    background-color: #e9ecef;
+    font-weight: bold;
+}
+
+hr { /* The '---' in markdown */
+    border: 0;
+    height: 1px;
+    background: #ccc;
+    margin: 2em 0;
+} 

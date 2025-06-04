@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 import re # For parsing
 
 # Load environment variables
-load_dotenv()
+load_dotenv() # Temporarily commented out
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -17,8 +17,8 @@ class TestCaseAnalyzer:
     def __init__(self):
         self.api_key = os.getenv("OPENAI_API_KEY")
         if not self.api_key:
-            logger.error("OPENAI_API_KEY environment variable is not set.")
-            raise ValueError("OPENAI_API_KEY environment variable is not set")
+            logger.error("OPENAI_API_KEY environment variable is not set. (load_dotenv is commented out)")
+            raise ValueError("OPENAI_API_KEY environment variable is not set. (load_dotenv is commented out)")
         self.client = OpenAI(api_key=self.api_key)
 
     def _generate_test_case_prompt(self, element: UIElement, website_context: Dict[str, Any] = None) -> str:
@@ -54,8 +54,7 @@ Think about what a user would be trying to achieve by interacting with this elem
 4.  **Related Elements:** If the flow involves other crucial elements for actions or verification, list their selectors and purpose.
 5.  **Preconditions:** List specific conditions that must be true *before* starting the test steps.
 6.  **Actionable Steps:** Write clear, sequential steps. Each step must include an "Action" and an "Expected Result."
-7.  **Postconditions:** Describe the state of the system *after* the test steps are successfully executed.
-8.  **Placeholder Data:** Use bracketed placeholders for dynamic data (e.g., `[Valid Username]`, `[Product Name]`, `[Test Item Price]`).
+7.  **Placeholder Data:** Use bracketed placeholders for dynamic data (e.g., `[Valid Username]`, `[Product Name]`, `[Test Item Price]`).
 
 **Output Format (Strict Markdown):**
 
@@ -65,12 +64,6 @@ Think about what a user would be trying to achieve by interacting with this elem
 * **Type:** [End-to-End | Functional | Usability | Edge Case | Scenario-Based]
 * **Priority:** [High | Medium | Low]
 * **Description:** [Clear, concise description of the test case's objective and the user flow it covers.]
-* **Primary Element Under Test:**
-    * Selector: `{element.selector}`
-    * Purpose in this test: [e.g., To initiate the 'Add to Cart' process]
-* **Related Elements (if applicable for the flow):**
-    * `[selector_for_related_element_1]` - [Purpose, e.g., Cart icon to verify item count update]
-    * `[selector_for_related_element_2]` - [Purpose, e.g., Confirmation message display]
 * **Preconditions:**
     * The user is on the [Page Name/URL where the primary element is located].
     * [e.g., At least one product is available for purchase.]
@@ -83,10 +76,6 @@ Think about what a user would be trying to achieve by interacting with this elem
     3. **Action:** [e.g., Click on the cart icon (`[selector_for_cart_icon]`) ]
        **Expected Result:** [e.g., The shopping cart page loads, displaying '[Product Name]' with quantity 1.]
     *--(Add more steps as needed to complete the scenario)--*
-* **Postconditions:**
-    * [e.g., The product '[Product Name]' is successfully added to the user's session cart.]
-    * [e.g., An order confirmation is displayed (for a checkout flow).]
-    * [e.g., Inventory for '[Product Name]' is updated accordingly (if testable via UI/mock response).]
 
 ---
 Now, please generate the test case based on the Primary UI Element Details and any context provided above.
