@@ -1,11 +1,13 @@
 from typing import List, Dict, Any
-from openai import OpenAI
+from openai import OpenAI, AsyncOpenAI
 from .models import UIElement, TestCase, TestStep # Assuming TestStep might be used later if parsing full steps
 import logging
 import os
 from datetime import datetime
 from dotenv import load_dotenv
 import re # For parsing
+import asyncio
+import json
 
 # Load environment variables
 load_dotenv() # Temporarily commented out
@@ -19,7 +21,7 @@ class TestCaseAnalyzer:
         if not self.api_key:
             logger.error("OPENAI_API_KEY environment variable is not set. (load_dotenv is commented out)")
             raise ValueError("OPENAI_API_KEY environment variable is not set. (load_dotenv is commented out)")
-        self.client = OpenAI(api_key=self.api_key)
+        self.client = AsyncOpenAI(api_key=self.api_key)
 
     def _generate_test_case_prompt(self, element: UIElement, website_context: Dict[str, Any] = None) -> str:
         """
@@ -124,24 +126,24 @@ If the element is very generic (e.g. a 'div' with no clear text), try to infer i
         return data
 
 
-    def analyze_element(self, element: UIElement, website_context: Dict[str, Any] = None) -> TestCase:
+    async def analyze_element(self, element: UIElement, website_context: Dict[str, Any] = None) -> TestCase:
         try:
             prompt_content = self._generate_test_case_prompt(element, website_context)
             
-            logger.info(f"Attempting to generate test case for element: {element.selector} ({element.element_type}) with context: {website_context}")
+            logger.info(f"Attempting to generate test case for element: {element.selector} ({element.element_type})")
 
-            response = self.client.chat.completions.create(
-                model="gpt-4.1", # Using a capable model like gpt-4 or gpt-4o is crucial
+            response = await self.client.chat.completions.create(
+                model="gpt-4",
                 messages=[
                     {"role": "system", "content": "You are an expert QA Automation Engineer tasked with generating detailed, scenario-based test cases in Markdown format from UI element data and contextual website information. Focus on user flows and comprehensive verification."},
                     {"role": "user", "content": prompt_content}
                 ],
-                temperature=0.6, # A balance between creativity and determinism for feature interpretation
-                max_tokens=2500 # Increased to allow for more comprehensive test cases
+                temperature=0.6,
+                max_tokens=2500
             )
             
             test_case_markdown = response.choices[0].message.content
-            logger.info(f"Successfully generated markdown for element {element.element_id}:\n{test_case_markdown[:500]}...") # Log snippet
+            logger.info(f"Successfully generated markdown for element {element.element_id}")
 
             # Parse markdown for key fields
             parsed_data = self._parse_markdown_to_testcase_fields(test_case_markdown, element.element_id, element.element_type)
@@ -151,28 +153,42 @@ If the element is very generic (e.g. a 'div' with no clear text), try to infer i
                 test_case_title=parsed_data["test_case_title"],
                 type=parsed_data["type"],
                 priority=parsed_data["priority"],
-                description=parsed_data["description"], # Full markdown stored in description
-                preconditions=[],   # These are embedded in the markdown
-                steps=[],           # These are embedded in the markdown
+                description=parsed_data["description"],
+                preconditions=[],
+                steps=[],
                 related_element_id=parsed_data["related_element_id"]
             )
         except Exception as e:
-            logger.error(f"Error analyzing element {element.element_id} ({element.selector}): {str(e)}", exc_info=True)
-            # Fallback or re-raise: For now, re-raising to indicate failure.
-            # Consider returning a basic TestCase or a special error marker if needed.
+            logger.error(f"Error analyzing element {element.element_id} ({element.selector}): {str(e)}")
             raise
 
-    def analyze_elements(self, elements: List[UIElement], website_context: Dict[str, Any] = None) -> List[TestCase]:
-        test_cases = []
-        for i, element in enumerate(elements):
-            logger.info(f"Processing element {i+1}/{len(elements)}: {element.element_id} ({element.selector})")
-            try:
-                # Pass the website_context to analyze_element
-                test_case = self.analyze_element(element, website_context)
-                test_cases.append(test_case)
-            except Exception as e: # Catching broader exceptions from analyze_element
-                logger.warning(f"Failed to generate test case for element {element.element_id} ({element.selector}) due to: {str(e)}. Skipping this element.")
-                # Optionally, create a placeholder error TestCase:
-                # test_cases.append(TestCase(test_case_id=f"ERROR_TC_{element.element_id}", ... , description=f"Failed to generate: {str(e)}"))
-                continue # Continue with the next element
+    async def analyze_elements(self, elements: List[UIElement], website_context: Dict[str, Any] = None) -> List[TestCase]:
+        logger.info(f"Processing {len(elements)} elements concurrently")
+        
+        # Create tasks for all elements
+        tasks = [
+            self.analyze_element(element, website_context)
+            for element in elements
+        ]
+        
+        # Process elements concurrently with a semaphore to limit concurrent API calls
+        semaphore = asyncio.Semaphore(5)  # Limit to 5 concurrent API calls
+        
+        async def process_with_semaphore(task):
+            async with semaphore:
+                try:
+                    return await task
+                except Exception as e:
+                    logger.warning(f"Failed to generate test case: {str(e)}")
+                    return None
+        
+        # Wait for all tasks to complete
+        results = await asyncio.gather(
+            *[process_with_semaphore(task) for task in tasks]
+        )
+        
+        # Filter out None results from failed tasks
+        test_cases = [result for result in results if result is not None]
+        
+        logger.info(f"Successfully generated {len(test_cases)} test cases")
         return test_cases

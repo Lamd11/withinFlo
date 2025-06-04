@@ -91,10 +91,13 @@ def process_url(job_id: str, url: str, auth: dict = None, website_context: dict 
         crawl_result = loop.run_until_complete(crawl_website())
         elements = crawl_result['elements']
         page_title = crawl_result['page_title']
-        loop.close()
 
-        # Analyze elements and generate test cases
-        test_cases = analyzer.analyze_elements(elements, website_context)
+        # Analyze elements and generate test cases asynchronously
+        async def analyze_elements():
+            test_cases = await analyzer.analyze_elements(elements, website_context)
+            return test_cases
+
+        test_cases = loop.run_until_complete(analyze_elements())
         logger.info(f"Generated {len(test_cases)} test cases")
 
         # Create analysis result
