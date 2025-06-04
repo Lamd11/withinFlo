@@ -15,6 +15,5 @@
 {% for test_case in generated_test_cases %}
 {{ test_case.description }}
 
----
 {% endfor %}
 
