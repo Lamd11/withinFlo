@@ -47,16 +47,8 @@ export default function ResultsViewer({ markdown, json, jobId }: ResultsViewerPr
     try {
       const response = await fetch(`/api/jobs/${jobId}/results/pdf`);
       if (!response.ok) {
-        const errorData = await response.json().catch(() => null);
-        const errorMessage = errorData?.error || response.statusText;
-        throw new Error(`Failed to download PDF: ${errorMessage}`);
+        throw new Error(`Failed to download PDF: ${response.statusText}`);
       }
-      
-      const contentType = response.headers.get('content-type');
-      if (!contentType || !contentType.includes('application/pdf')) {
-        throw new Error('Received invalid content type from server');
-      }
-
       const blob = await response.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -68,8 +60,6 @@ export default function ResultsViewer({ markdown, json, jobId }: ResultsViewerPr
       URL.revokeObjectURL(url);
     } catch (error) {
       console.error("Error downloading PDF:", error);
-      // You might want to show this error to the user through a toast notification or alert
-      alert(error instanceof Error ? error.message : 'Failed to download PDF');
     }
   };
 
