@@ -180,7 +180,6 @@ class WebsiteCrawler:
             await page.close()
 
     async def crawl(self, url: str, strategy: ScanStrategy, auth: dict = None) -> Dict[str, Any]:
-
         if not strategy:
             logger.warning("No strategy provided. Cannot scan")
         logger.info(f"Starting crawl of {url}")
@@ -213,30 +212,67 @@ class WebsiteCrawler:
                     text_contains = desc.get('text_contains', '')
                     purpose = desc.get('purpose', '')
 
-                    # Build Attribute selector strings
+                    # Build multiple selector strategies
+                    selectors = []
+                    
+                    # Strategy 1: Direct attribute matching
                     attr_selector = []
                     for attr_name, attr_value in attributes.items():
-                        if attr_value == '*': # Handles wild card values
+                        if attr_value == '*':
                             attr_selector.append(f'[{attr_name}]')
-                        else: # Handles specific attribute values and can escape double quotes
+                        else:
                             escaped_value = str(attr_value).replace('"', '\\"')
                             attr_selector.append(f'[{attr_name}="{escaped_value}"]')
-                    attr_selector_string = ''.join(attr_selector)
-                    base_css_selector = f"{tag_type}{''.join(attr_selector)}"
-
-                    logger.info(f"Searching for elements with selector: {base_css_selector}")
+                    selectors.append(f"{tag_type}{''.join(attr_selector)}")
                     
-                    locator = page.locator(base_css_selector)
-                    # Filtering if specified
+                    # Strategy 2: Contains text matching
                     if text_contains:
-                        locator = locator.filter(has_text=text_contains)
+                        text_selector = f"{tag_type}:has-text('{text_contains}')"
+                        selectors.append(text_selector)
+                        
+                        # Also try with innerText for deeper nested elements
+                        inner_text_selector = f"{tag_type} >> text={text_contains}"
+                        selectors.append(inner_text_selector)
                     
-                    # Using locator all does not wait until everything is dynamically loaded
-                    # May need to edit this in the future
-                    found_elements = await locator.all()
+                    # Strategy 3: Nested element search with contains
+                    if text_contains:
+                        nested_selector = f"//*[contains(text(), '{text_contains}')]"
+                        selectors.append(nested_selector)
 
-                    # Processing elements
-                    for i, element in enumerate(found_elements):
+                    # Try each selector strategy
+                    found_elements = []
+                    for selector in selectors:
+                        logger.info(f"Trying selector strategy: {selector}")
+                        try:
+                            # Use waitForSelector with a short timeout to handle dynamic content
+                            try:
+                                await page.wait_for_selector(selector, timeout=2000)
+                            except:
+                                logger.debug(f"Selector {selector} not immediately available")
+                                
+                            # Get all elements matching the selector
+                            current_elements = await page.locator(selector).all()
+                            
+                            if current_elements:
+                                logger.info(f"Found {len(current_elements)} elements with selector: {selector}")
+                                found_elements.extend(current_elements)
+                            
+                        except Exception as selector_error:
+                            logger.debug(f"Selector strategy {selector} failed: {str(selector_error)}")
+                            continue
+
+                    # Remove duplicates based on element handle comparison
+                    unique_elements = []
+                    seen_handles = set()
+                    
+                    for element in found_elements:
+                        handle = await element.evaluate('element => element.outerHTML')
+                        if handle not in seen_handles:
+                            seen_handles.add(handle)
+                            unique_elements.append(element)
+
+                    # Processing unique elements
+                    for i, element in enumerate(unique_elements):
                         try:
                             element_info = await self._extract_element_info(element)
                             purpose_slug = purpose.lower().replace(' ', '_')[:30]
