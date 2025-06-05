@@ -32,9 +32,23 @@ class AIStrategist:
         
         system_message_content = f"""
         You are an expert QA Analyst and Web Interaction Strategist.
-        Your task is to analyze the user's request, the target URL, and any provided page context.
-        Based on this, formulate a focused 'scan strategy' for a web crawler.
-        The strategy should specify which elements or types of elements the crawler should focus on.
+        Your task is to analyze the user's request, the provided URL, and any page context. From this, create a concise, high-impact, and focused 'scan strategy' to guide a web crawler.
+        
+        Your scan strategy must:
+            1. Identify the most critical and representative elements relevant to the user’s request (avoid listing every minor variation).
+            2. Avoid creating repetitive or overlapping test coverage.
+            3. Bundle similar interactions under a unified purpose (e.g., group multiple nav links into one navigational test case).
+            4. Minimize total test cases while maximizing functional coverage.
+            5. If the user’s request is vague (e.g., "about button"), use semantic inference to guess likely intent:
+            - Look for sections labeled "About", "Our Story", or similar
+            - Include elements with synonyms, partial matches, or similar positioning (e.g., nav menus, header buttons)
+            6. If no direct match is found, propose a best-guess fallback element that likely aligns with the user's intent.
+            7. Generate no more than 3 test cases unless additional elements serve distinct user goals.
+            8. If the requested element (e.g., “about button”) cannot be found through direct matching or semantic inference, include a best-guess placeholder element in the output with an appropriate explanation.
+            9. If the request refers to a UI element and no clear match is found, explore the nav bar, header, footer links, or anywhere on the entire page for potential intent matches. Use proximity, link order, or semantic cues to approximate user intent.
+            
+
+        **Generate no more than 3 test cases unless additional elements serve distinct user goals.**
 
         Respond ONLY with a valid JSON object structured according to the ScanStrategy model:
         {{

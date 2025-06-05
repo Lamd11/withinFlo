@@ -51,7 +51,6 @@ Think about what a user would be trying to achieve by interacting with this elem
 1.  **Identify Feature/User Flow:** Based on the element and any provided context, determine a relevant user flow or feature to test. For example, if the element is an "Add to Cart" button, the feature is "Add Product to Cart and Verify Cart Update." If it's a username field, the flow could be "Successful User Login."
 2.  **Define Scope:** The test case should cover a focused scenario. This might involve a few steps: an action on the primary element, and then verification steps that might involve other related elements or system feedback.
 3.  **Test Case ID:** Construct a meaningful Test Case ID. Use the format: `TC_[FEATURE_ABBREVIATION]_[SCENARIO_DESCRIPTION_ABBREVIATION]_[SEQUENCE_NUMBER]`. For example: `TC_CART_ADD_VERIFY_001` or `TC_LOGIN_SUCCESS_001`. The AI should generate this based on the test case content.
-4.  **Related Elements:** If the flow involves other crucial elements for actions or verification, list their selectors and purpose.
 5.  **Preconditions:** List specific conditions that must be true *before* starting the test steps.
 6.  **Actionable Steps:** Write clear, sequential steps. Each step must include an "Action" and an "Expected Result."
 7.  **Placeholder Data:** Use bracketed placeholders for dynamic data (e.g., `[Valid Username]`, `[Product Name]`, `[Test Item Price]`).
