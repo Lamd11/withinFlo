@@ -89,22 +89,50 @@ def process_url(job_id: str, url: str, auth: dict = None, website_context: dict 
 
         # Crawl the website with the strategy
         crawl_result = loop.run_until_complete(crawl_website())
-        elements = crawl_result['elements']
-        page_title = crawl_result['page_title']
         loop.close()
 
-        # Analyze elements and generate test cases
-        test_cases = analyzer.analyze_elements(elements, website_context)
-        logger.info(f"Generated {len(test_cases)} test cases")
+        # Process multi-page results
+        all_elements = []
+        all_test_cases = []
+        main_page_title = None
+
+        for page_result in crawl_result['pages']:
+            # Add page URL to element context
+            for element in page_result['elements']:
+                element.page_url = page_result['url']
+                element.page_title = page_result['page_title']
+                all_elements.append(element)
+
+            # Set main page title from the initial page
+            if page_result['url'] == url:
+                main_page_title = page_result['page_title']
+
+            # Update website context with current page info
+            page_context = website_context.copy() if website_context else {}
+            page_context.update({
+                'current_page_url': page_result['url'],
+                'current_page_title': page_result['page_title'],
+                'navigation_depth': page_result['depth']
+            })
+
+            # Analyze elements for this page
+            page_test_cases = analyzer.analyze_elements(page_result['elements'], page_context)
+            all_test_cases.extend(page_test_cases)
+
+        logger.info(f"Generated {len(all_test_cases)} test cases across {crawl_result['total_pages_scanned']} pages")
 
         # Create analysis result
         result = AnalysisResult(
             source_url=url,
             analysis_timestamp=datetime.utcnow(),
-            page_title=page_title,
-            identified_elements=elements,
-            generated_test_cases=test_cases,
-            website_context=website_context
+            page_title=main_page_title or "Multiple Pages Analyzed",
+            identified_elements=all_elements,
+            generated_test_cases=all_test_cases,
+            website_context={
+                **website_context,
+                'total_pages_scanned': crawl_result['total_pages_scanned'],
+                'scanned_urls': list(crawl_result.get('scanned_urls', []))
+            }
         )
 
         # Generate documentation
