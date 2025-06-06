@@ -41,11 +41,32 @@ def process_url(job_id: str, url: str, auth: dict = None, website_context: dict 
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
 
-        # Create ScanStrategy to send to crawler
+        # First, do an initial crawl to get page structure and content
+        async def initial_crawl():
+            async with WebsiteCrawler() as crawler:
+                # Create a basic strategy for initial content extraction
+                basic_strategy = ScanStrategy(
+                    focus_areas=["page_content"],
+                    target_elements_description=[{"type": "*", "attributes": {}, "purpose": "initial_scan"}]
+                )
+                page_details = await crawler.crawl(url, basic_strategy, auth)
+                return page_details
+
+        # Get initial page data including structured content
+        logger.info(f"Job {job_id}: Starting initial crawl to extract page content...")
+        initial_crawl_result = loop.run_until_complete(initial_crawl())
+        structured_content = initial_crawl_result.get('structured_content', {})
+        html_snapshot = initial_crawl_result.get('html_snapshot', '')
+        page_title = initial_crawl_result.get('page_title', '')
+
+        # Now create an informed scan strategy using the actual page content
         strategist = AIStrategist()
+        logger.info(f"Job {job_id}: Generating informed scan strategy using extracted content...")
         scan_strategy_obj: Optional[ScanStrategy] = strategist.develop_scan_strategy(
             user_prompt=user_prompt,
             url=url,
+            structured_content=structured_content,
+            page_html_snapshot=html_snapshot,
             existing_website_context=website_context,
         )
 
@@ -66,36 +87,39 @@ def process_url(job_id: str, url: str, auth: dict = None, website_context: dict 
         analyzer = TestCaseAnalyzer()
         generator = DocumentationGenerator()
 
-        # Run async crawl
-        async def crawl_website():
+        # Run second crawl with the informed strategy to get targeted elements
+        async def targeted_crawl():
             async with WebsiteCrawler() as crawler:
                 page_details = await crawler.crawl(url, scan_strategy_obj, auth)
                 return page_details
 
-        # Crawl the website
-        crawl_result = loop.run_until_complete(crawl_website())
+        # Crawl the website with the informed strategy
+        logger.info(f"Job {job_id}: Running targeted crawl with informed strategy...")
+        crawl_result = loop.run_until_complete(targeted_crawl())
         elements = crawl_result['elements']
-        page_title = crawl_result['page_title']
+        
+        # Use page title from either crawl (should be the same)
+        final_page_title = crawl_result.get('page_title', page_title)
         loop.close()
 
         # Update website context with page title if available
         if website_context is None:
             website_context = {}
         
-        if page_title and 'current_page_description' not in website_context:
-            website_context['current_page_description'] = page_title
+        if final_page_title and 'current_page_description' not in website_context:
+            website_context['current_page_description'] = final_page_title
             
-        logger.info(f"Processing {len(elements)} elements with context: {website_context}")
+        logger.info(f"Job {job_id}: Processing {len(elements)} targeted elements with context: {website_context}")
 
         # Analyze elements and generate test cases
         test_cases = analyzer.analyze_elements(elements, website_context)
-        logger.info(f"Generated {len(test_cases)} test cases")
+        logger.info(f"Job {job_id}: Generated {len(test_cases)} test cases")
 
         # Create analysis result
         result = AnalysisResult(
             source_url=url,
             analysis_timestamp=datetime.utcnow(),
-            page_title=page_title,
+            page_title=final_page_title,
             identified_elements=elements,
             generated_test_cases=test_cases,
             website_context=website_context
@@ -115,6 +139,7 @@ def process_url(job_id: str, url: str, auth: dict = None, website_context: dict 
             }}
         )
 
+        logger.info(f"Job {job_id}: Successfully completed processing")
         return job_id
 
     except Exception as e:

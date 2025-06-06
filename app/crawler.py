@@ -2,6 +2,7 @@ from playwright.async_api import async_playwright
 from typing import List, Dict, Any
 from .models import UIElement, AuthConfig, ScanStrategy
 import logging
+import json
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -39,6 +40,160 @@ class WebsiteCrawler:
                 await page.set_extra_http_headers({
                     "Authorization": f"Bearer {auth.token}"
                 })
+
+    async def _wait_for_dynamic_content(self, page):
+        """Enhanced waiting strategy for dynamic content to load completely"""
+        try:
+            # 1. Wait for network activity to cease - more robust than fixed timeout
+            logger.info("Waiting for network activity to cease...")
+            await page.wait_for_load_state('networkidle', timeout=30000)
+            
+            # 2. Wait for common navigation elements to be present (helps with SPAs)
+            common_nav_selectors = ['nav', 'header', '[role="navigation"]', '.navbar', '.navigation']
+            for selector in common_nav_selectors:
+                try:
+                    await page.wait_for_selector(selector, timeout=5000)
+                    logger.info(f"Found navigation element: {selector}")
+                    break
+                except:
+                    continue
+            
+            # 3. Scroll to trigger lazy-loaded content, then wait again
+            logger.info("Scrolling to trigger lazy-loaded content...")
+            await page.evaluate('window.scrollTo(0, document.body.scrollHeight)')
+            await page.wait_for_timeout(2000)  # Brief wait for scroll-triggered content
+            
+            # 4. Scroll back to top for consistent starting position
+            await page.evaluate('window.scrollTo(0, 0)')
+            await page.wait_for_timeout(1000)
+            
+            # 5. Final networkidle wait to catch any scroll-triggered requests
+            await page.wait_for_load_state('networkidle', timeout=10000)
+            logger.info("Dynamic content loading completed")
+            
+        except Exception as e:
+            logger.warning(f"Dynamic content waiting completed with some timeouts: {e}")
+
+    async def _extract_structured_content(self, page) -> Dict[str, Any]:
+        """Extract structured content (buttons, links, etc.) for better LLM input"""
+        try:
+            logger.info("Extracting structured content for LLM...")
+            
+            # Extract visible interactive elements with their semantic information
+            structured_content = await page.evaluate("""() => {
+                const elements = [];
+                
+                // Get all visible buttons
+                const buttons = Array.from(document.querySelectorAll('button:not([style*="display: none"]):not([style*="visibility: hidden"])'));
+                buttons.forEach(btn => {
+                    const rect = btn.getBoundingClientRect();
+                    if (rect.width > 0 && rect.height > 0) {
+                        const text = btn.textContent?.trim() || '';
+                        const ariaLabel = btn.getAttribute('aria-label') || '';
+                        const title = btn.getAttribute('title') || '';
+                        if (text || ariaLabel || title) {
+                            elements.push({
+                                type: 'button',
+                                text: text,
+                                aria_label: ariaLabel,
+                                title: title,
+                                id: btn.id || '',
+                                classes: btn.className || '',
+                                name: btn.name || ''
+                            });
+                        }
+                    }
+                });
+                
+                // Get all visible links
+                const links = Array.from(document.querySelectorAll('a:not([style*="display: none"]):not([style*="visibility: hidden"])'));
+                links.forEach(link => {
+                    const rect = link.getBoundingClientRect();
+                    if (rect.width > 0 && rect.height > 0) {
+                        const text = link.textContent?.trim() || '';
+                        const ariaLabel = link.getAttribute('aria-label') || '';
+                        const href = link.getAttribute('href') || '';
+                        const title = link.getAttribute('title') || '';
+                        if ((text || ariaLabel || title) && href && !href.startsWith('javascript:') && href !== '#') {
+                            elements.push({
+                                type: 'link',
+                                text: text,
+                                href: href,
+                                aria_label: ariaLabel,
+                                title: title,
+                                id: link.id || '',
+                                classes: link.className || ''
+                            });
+                        }
+                    }
+                });
+                
+                // Get all visible input fields
+                const inputs = Array.from(document.querySelectorAll('input:not([style*="display: none"]):not([style*="visibility: hidden"]), textarea:not([style*="display: none"]):not([style*="visibility: hidden"]), select:not([style*="display: none"]):not([style*="visibility: hidden"])'));
+                inputs.forEach(input => {
+                    const rect = input.getBoundingClientRect();
+                    if (rect.width > 0 && rect.height > 0) {
+                        const placeholder = input.getAttribute('placeholder') || '';
+                        const ariaLabel = input.getAttribute('aria-label') || '';
+                        const label = input.labels?.[0]?.textContent?.trim() || '';
+                        const name = input.getAttribute('name') || '';
+                        const type = input.getAttribute('type') || input.tagName.toLowerCase();
+                        
+                        elements.push({
+                            type: 'input',
+                            input_type: type,
+                            placeholder: placeholder,
+                            aria_label: ariaLabel,
+                            label: label,
+                            name: name,
+                            id: input.id || '',
+                            classes: input.className || ''
+                        });
+                    }
+                });
+                
+                // Get navigation-specific elements
+                const navElements = Array.from(document.querySelectorAll('nav *, [role="navigation"] *, .navbar *, .navigation *, header *'));
+                const navItems = [];
+                navElements.forEach(el => {
+                    if ((el.tagName === 'A' || el.tagName === 'BUTTON') && el.textContent?.trim()) {
+                        const rect = el.getBoundingClientRect();
+                        if (rect.width > 0 && rect.height > 0) {
+                            navItems.push({
+                                type: 'navigation_item',
+                                text: el.textContent.trim(),
+                                tag: el.tagName.toLowerCase(),
+                                href: el.getAttribute('href') || '',
+                                classes: el.className || ''
+                            });
+                        }
+                    }
+                });
+                
+                return {
+                    interactive_elements: elements,
+                    navigation_elements: navItems,
+                    total_elements: elements.length + navItems.length
+                };
+            }""")
+            
+            logger.info(f"Extracted {structured_content['total_elements']} structured elements")
+            return structured_content
+            
+        except Exception as e:
+            logger.error(f"Error extracting structured content: {e}")
+            return {"interactive_elements": [], "navigation_elements": [], "total_elements": 0}
+
+    async def _extract_html_snapshot(self, page) -> str:
+        """Extract complete HTML snapshot after dynamic content has loaded"""
+        try:
+            logger.info("Extracting complete HTML snapshot...")
+            html_content = await page.content()
+            logger.info(f"Extracted HTML content ({len(html_content)} characters)")
+            return html_content
+        except Exception as e:
+            logger.error(f"Error extracting HTML snapshot: {e}")
+            return ""
 
     async def _extract_element_info(self, element) -> Dict[str, Any]:
         try:
@@ -105,11 +260,8 @@ class WebsiteCrawler:
             }
             return path.join(' > ');
         }""")
-    
-
 
     async def crawl(self, url: str, strategy: ScanStrategy, auth: dict = None) -> Dict[str, Any]:
-
         if not strategy:
             logger.warning("No strategy provided. Cannot scan")
         logger.info(f"Starting crawl of {url}")
@@ -124,14 +276,20 @@ class WebsiteCrawler:
             # Navigate to the page
             await page.goto(url, wait_until="networkidle")
             
-            # Wait for dynamic content
-            await page.wait_for_timeout(5000)  # 5 seconds wait for dynamic content
+            # Enhanced waiting for dynamic content to fully load
+            await self._wait_for_dynamic_content(page)
+            
+            # Extract complete HTML snapshot for potential LLM use
+            html_snapshot = await self._extract_html_snapshot(page)
+            
+            # Extract structured content for better LLM analysis
+            structured_content = await self._extract_structured_content(page)
             
             # Get page title
             page_title = await page.title()
             logger.info(f"Page title: {page_title}")
             
-            # Find all interactive elements
+            # Find all interactive elements using existing strategy-based approach
             elements = []
             
             for desc in strategy.target_elements_description:
@@ -160,8 +318,6 @@ class WebsiteCrawler:
                     if text_contains:
                         locator = locator.filter(has_text=text_contains)
                     
-                    # Using locator all does not wait until everything is dynamically loaded
-                    # May need to edit this in the future
                     found_elements = await locator.all()
 
                     # Processing elements
@@ -185,10 +341,12 @@ class WebsiteCrawler:
             
             logger.info(f"Found {len(elements)} elements on {url}")
             
-            # Return both elements and page title in a dictionary
+            # Return enhanced data including HTML snapshot and structured content
             return {
                 "elements": elements,
-                "page_title": page_title
+                "page_title": page_title,
+                "html_snapshot": html_snapshot,
+                "structured_content": structured_content
             }
             
         except Exception as e:
