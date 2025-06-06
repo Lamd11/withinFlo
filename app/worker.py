@@ -4,12 +4,14 @@ from .crawler import WebsiteCrawler
 from .analyzer import TestCaseAnalyzer
 from .generator import DocumentationGenerator
 from .ai_strategist import AIStrategist
-from .models import AnalysisResult, JobStatus, ScanStrategy
+from .element_mapper import ElementMapper
+from .models import AnalysisResult, JobStatus, ScanStrategy, PageElementMap, DateTimeEncoder
 from datetime import datetime
 import os
 import logging
 from pymongo import MongoClient
 import asyncio
+import json
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -45,15 +47,25 @@ def process_url(job_id: str, url: str, auth: dict = None, website_context: dict 
         strategist = AIStrategist()
         analyzer = TestCaseAnalyzer()
         generator = DocumentationGenerator()
+        element_mapper = ElementMapper()
 
-        # First, get initial website content
-        async def get_website_content():
+        # Phase 1: Initial Discovery
+        async def initial_discovery():
             async with WebsiteCrawler() as crawler:
+                # Get initial website content
                 content = await crawler.get_initial_content(url, auth)
-                return content
+                
+                # Create comprehensive element map
+                page = await crawler.browser.new_page()
+                await page.goto(url, wait_until="networkidle")
+                element_map = await element_mapper.create_element_map(page)
+                await page.close()
+                
+                return content, element_map
 
-        # Get initial website content
-        website_content = loop.run_until_complete(get_website_content())
+        # Run initial discovery
+        logger.info(f"Job {job_id}: Starting Phase 1 - Initial Discovery")
+        website_content, element_map = loop.run_until_complete(initial_discovery())
         
         # Update website context with page title if available
         if website_context is None:
@@ -61,11 +73,13 @@ def process_url(job_id: str, url: str, auth: dict = None, website_context: dict 
         if website_content.get('page_title') and 'current_page_description' not in website_context:
             website_context['current_page_description'] = website_content['page_title']
 
-        # Create ScanStrategy using the website content
+        # Phase 2: Create Informed Scan Strategy
+        logger.info(f"Job {job_id}: Creating informed scan strategy with element map")
         scan_strategy_obj: Optional[ScanStrategy] = strategist.develop_scan_strategy(
             user_prompt=user_prompt,
             url=url,
             website_content=website_content,
+            element_map=element_map,
             existing_website_context=website_context,
         )
 
@@ -81,14 +95,15 @@ def process_url(job_id: str, url: str, auth: dict = None, website_context: dict 
             )
             return
 
-        # Run targeted crawl with the strategy
-        async def crawl_website():
+        # Phase 3: Targeted Crawl
+        logger.info(f"Job {job_id}: Starting Phase 3 - Targeted Crawl")
+        async def targeted_crawl():
             async with WebsiteCrawler() as crawler:
                 page_details = await crawler.crawl(url, scan_strategy_obj, auth)
                 return page_details
 
         # Crawl the website with the strategy
-        crawl_result = loop.run_until_complete(crawl_website())
+        crawl_result = loop.run_until_complete(targeted_crawl())
         loop.close()
 
         # Process multi-page results
@@ -112,7 +127,8 @@ def process_url(job_id: str, url: str, auth: dict = None, website_context: dict 
             page_context.update({
                 'current_page_url': page_result['url'],
                 'current_page_title': page_result['page_title'],
-                'navigation_depth': page_result['depth']
+                'navigation_depth': page_result['depth'],
+                'element_map': element_map.dict()  # Use dict() method which handles datetime
             })
 
             # Analyze elements for this page
@@ -131,21 +147,27 @@ def process_url(job_id: str, url: str, auth: dict = None, website_context: dict 
             website_context={
                 **website_context,
                 'total_pages_scanned': crawl_result['total_pages_scanned'],
-                'scanned_urls': list(crawl_result.get('scanned_urls', []))
+                'scanned_urls': list(crawl_result.get('scanned_urls', [])),
+                'element_map': element_map.dict()  # Use dict() method which handles datetime
             }
         )
 
         # Generate documentation
         documentation = generator.generate_documentation(result)
 
+        # Convert result to dict and ensure all datetime objects are serialized
+        result_dict = json.loads(json.dumps(result.dict(), cls=DateTimeEncoder))
+        element_map_dict = json.loads(json.dumps(element_map.dict(), cls=DateTimeEncoder))
+
         # Update job with results
         jobs_collection.update_one(
             {'_id': job_id},
             {'$set': {
                 'status': JobStatus.COMPLETED,
-                'updated_at': datetime.utcnow(),
-                'result': result.dict(),
-                'documentation': documentation
+                'updated_at': datetime.utcnow().isoformat(),  # Convert to ISO string
+                'result': result_dict,
+                'documentation': documentation,
+                'element_map': element_map_dict
             }}
         )
 
@@ -158,7 +180,7 @@ def process_url(job_id: str, url: str, auth: dict = None, website_context: dict 
             {'_id': job_id},
             {'$set': {
                 'status': JobStatus.FAILED,
-                'updated_at': datetime.utcnow(),
+                'updated_at': datetime.utcnow().isoformat(),  # Convert to ISO string
                 'error': str(e)
             }}
         )

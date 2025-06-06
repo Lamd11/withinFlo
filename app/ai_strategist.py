@@ -4,7 +4,7 @@ from typing import List, Dict, Any, Optional
 import logging
 import json
 from dotenv import load_dotenv
-from .models import ScanStrategy
+from .models import ScanStrategy, PageElementMap
 from pydantic import ValidationError
 
 
@@ -20,7 +20,7 @@ class AIStrategist:
             raise ValueError("OPEN_API_KEY environmental variable is not set")
         self.client = OpenAI(api_key=self.api_key)
 
-    def create_llm_messages(self, user_prompt: str, url: str, website_content: Dict[str, Any] = None, existing_website_context: Optional[Dict[str, Any]] = None) -> List[Dict[str, str]]:
+    def create_llm_messages(self, user_prompt: str, url: str, website_content: Dict[str, Any] = None, element_map: Optional[PageElementMap] = None, existing_website_context: Optional[Dict[str, Any]] = None) -> List[Dict[str, str]]:
         """
         Helper method to create system and user messages to insert into OpenAI's model. To formulate the scan strategy
         """ 
@@ -52,6 +52,19 @@ class AIStrategist:
                 text_content = website_content['text_content'][:1000] + "..." if len(website_content['text_content']) > 1000 else website_content['text_content']
                 context_parts.append(f"\nPage Content Preview:\n{text_content}")
 
+        if element_map:
+            context_parts.append("\nDetailed Element Map:")
+            for element in element_map.elements:
+                element_desc = [
+                    f"\nElement: {element.element_type} ({element.interaction_type})",
+                    f"Selector: {element.selector}",
+                    f"Text: {element.visible_text if element.visible_text else 'N/A'}",
+                    f"State: {element.state}",
+                ]
+                if element.accessibility:
+                    element_desc.append(f"Accessibility: {json.dumps(element.accessibility)}")
+                context_parts.extend(element_desc)
+        
         if existing_website_context:
             context_str = json.dumps(existing_website_context)
             context_parts.append(f"\nAdditional Context:\n{context_str}")
@@ -60,8 +73,11 @@ class AIStrategist:
         
         system_message_content = f"""
         You are an expert QA Analyst and Web Interaction Strategist.
-        Your task is to analyze the user's request, the target URL, and the provided page content and context.
+        Your task is to analyze the user's request, the target URL, and the provided page content, element map, and context.
         Based on this, formulate a focused 'scan strategy' for a web crawler that specifically addresses the user's needs.
+        
+        You have been provided with a detailed map of all interactive elements on the page.
+        Use this information to create a precise strategy that targets the exact elements needed.
         
         The strategy should specify which elements or types of elements the crawler should focus on to fulfill the user's request.
         DO NOT generate test cases or documentation - focus only on identifying the relevant elements to scan.
@@ -75,13 +91,15 @@ class AIStrategist:
               "type": "element_tag",
               "attributes": {{"attr_name": "value"}},
               "text_contains": "some text",
-              "purpose": "brief description of element's role in the user's goal"
+              "purpose": "brief description of element's role in the user's goal",
+              "selector": "exact_selector_from_element_map"  # Use this when possible
             }}
           ]
         }}
         
         The target_elements_description should be SPECIFIC to what the user wants to test or analyze.
         Each element description should clearly explain how it relates to the user's specific request.
+        When possible, use the exact selectors from the element map to ensure precise targeting.
         Remember: Return ONLY the JSON object with no additional text.
         """
 
@@ -93,6 +111,7 @@ class AIStrategist:
         {website_context}
 
         Please generate a focused scan strategy JSON that will help find ONLY the elements needed for the user's specific request.
+        Prefer using exact selectors from the element map when they match the needed elements.
         """
         
         return [
@@ -100,19 +119,19 @@ class AIStrategist:
             {"role": "user", "content": user_message_content.strip()}
         ]
 
-    def develop_scan_strategy(self, user_prompt: str, url: str, website_content: Optional[Dict[str, Any]] = None, existing_website_context: Optional[Dict[str, Any]] = None) -> Optional[ScanStrategy]:
+    def develop_scan_strategy(self, user_prompt: str, url: str, website_content: Optional[Dict[str, Any]] = None, element_map: Optional[PageElementMap] = None, existing_website_context: Optional[Dict[str, Any]] = None) -> Optional[ScanStrategy]:
         """
         Main public method of this class. It takes the user's request and other relevant info and returns the structured scan strategy.
         """
-        llm_res = self.prompt_formulation(user_prompt, url, website_content, existing_website_context)
+        llm_res = self.prompt_formulation(user_prompt, url, website_content, element_map, existing_website_context)
         parsed_strategy = self.parse_llm_response_to_strategy(llm_res)
         return parsed_strategy
     
-    def prompt_formulation(self, user_prompt: str, url: str, website_content: Optional[Dict[str, Any]] = None, existing_website_context: Optional[Dict[str, Any]] = None) -> str:
+    def prompt_formulation(self, user_prompt: str, url: str, website_content: Optional[Dict[str, Any]] = None, element_map: Optional[PageElementMap] = None, existing_website_context: Optional[Dict[str, Any]] = None) -> str:
         """
         Calls the LLM with the constructed prompt and returns the strategy content string.
         """
-        messages = self.create_llm_messages(user_prompt, url, website_content, existing_website_context)
+        messages = self.create_llm_messages(user_prompt, url, website_content, element_map, existing_website_context)
         try:
             logger.info("Attempting to generate scan strategy from user prompt and website content")
             response = self.client.chat.completions.create(

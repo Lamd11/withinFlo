@@ -128,10 +128,10 @@ If the element is very generic (e.g. a 'div' with no clear text), try to infer i
         try:
             prompt_content = self._generate_test_case_prompt(element, website_context)
             
-            logger.info(f"Attempting to generate test case for element: {element.selector} ({element.element_type}) with context: {website_context}")
+            logger.info(f"Attempting to generate test case for element: {element.selector} ({element.element_type})")
 
             response = self.client.chat.completions.create(
-                model="gpt-4.1", # Using a capable model like gpt-4 or gpt-4o is crucial
+                model="gpt-4", # Using a capable model like gpt-4 or gpt-4o is crucial
                 messages=[
                     {"role": "system", "content": "You are an expert QA Automation Engineer tasked with generating detailed, scenario-based test cases in Markdown format from UI element data and contextual website information. Focus on user flows and comprehensive verification."},
                     {"role": "user", "content": prompt_content}
