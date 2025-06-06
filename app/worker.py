@@ -28,6 +28,9 @@ jobs_collection = db['jobs']
 @celery_app.task
 def process_url(job_id: str, url: str, auth: dict = None, website_context: dict = None, user_prompt: str = None):
     try:
+        if not user_prompt:
+            logger.warning(f"Job {job_id}: No user prompt provided. This may result in ineffective testing.")
+            
         # Update job status to processing
         jobs_collection.update_one(
             {'_id': job_id},
@@ -46,78 +49,93 @@ def process_url(job_id: str, url: str, auth: dict = None, website_context: dict 
         analyzer = TestCaseAnalyzer()
         generator = DocumentationGenerator()
 
-        # First, get initial website content
-        async def get_website_content():
+        # Phase 1: Get comprehensive page map
+        logger.info(f"Phase 1: Getting comprehensive page map for {url}")
+        async def get_page_map():
             async with WebsiteCrawler() as crawler:
-                content = await crawler.get_initial_content(url, auth)
-                return content
+                page_map = await crawler.get_initial_content(url, auth)
+                return page_map
 
-        # Get initial website content
-        website_content = loop.run_until_complete(get_website_content())
+        # Get initial page map
+        page_map = loop.run_until_complete(get_page_map())
         
-        # Update website context with page title if available
+        # Update website context with page metadata and user prompt
         if website_context is None:
             website_context = {}
-        if website_content.get('page_title') and 'current_page_description' not in website_context:
-            website_context['current_page_description'] = website_content['page_title']
+        website_context.update({
+            'current_page_description': page_map['page_metadata']['title'],
+            'user_prompt': user_prompt  # Add user prompt to context
+        })
 
-        # Create ScanStrategy using the website content
+        # Phase 2: Create informed scan strategy using the page map
+        logger.info("Phase 2: Developing informed scan strategy")
         scan_strategy_obj: Optional[ScanStrategy] = strategist.develop_scan_strategy(
             user_prompt=user_prompt,
             url=url,
-            website_content=website_content,
+            page_map=page_map,
             existing_website_context=website_context,
         )
 
         if not scan_strategy_obj:
-            logger.error(f"Job {job_id}: AI Strategist failed to develop a scan strategy.")
+            error_msg = "Failed to generate scan strategy"
+            if not user_prompt:
+                error_msg += " (no user prompt provided)"
+            logger.error(f"Job {job_id}: {error_msg}")
             jobs_collection.update_one(
                 {'_id': job_id},
                 {'$set': {
                     'status': JobStatus.FAILED,
                     'updated_at': datetime.utcnow(),
-                    'error': "Failed to generate scan strategy"
+                    'error': error_msg
                 }}
             )
             return
 
-        # Run targeted crawl with the strategy
+        # Log strategy details
+        logger.info(f"Generated strategy with {len(scan_strategy_obj.target_elements_description)} target elements")
+        logger.info(f"Focus areas: {scan_strategy_obj.focus_areas}")
+
+        # Phase 3: Execute targeted crawl with informed strategy
+        logger.info("Phase 3: Executing targeted crawl with informed strategy")
         async def crawl_website():
             async with WebsiteCrawler() as crawler:
-                page_details = await crawler.crawl(url, scan_strategy_obj, auth)
-                return page_details
+                crawl_result = await crawler.crawl(url, scan_strategy_obj, auth)
+                return crawl_result
 
-        # Crawl the website with the strategy
+        # Crawl the website with the informed strategy
         crawl_result = loop.run_until_complete(crawl_website())
         loop.close()
 
-        # Process multi-page results
+        # Process results
         all_elements = []
         all_test_cases = []
-        main_page_title = None
+        main_page_title = page_map['page_metadata']['title']
 
         for page_result in crawl_result['pages']:
-            # Add page URL to element context
-            for element in page_result['elements']:
-                element.page_url = page_result['url']
-                element.page_title = page_result['page_title']
-                all_elements.append(element)
+            if not page_result.get('error'):
+                # Elements are already UIElement objects from the crawler
+                elements = page_result['elements']
+                
+                # Log found elements
+                logger.info(f"Found {len(elements)} elements on page: {page_result['url']}")
+                
+                # Add page context to each element
+                for element in elements:
+                    element.page_url = page_result['url']
+                    element.page_title = page_result['page_title']
+                    all_elements.append(element)
 
-            # Set main page title from the initial page
-            if page_result['url'] == url:
-                main_page_title = page_result['page_title']
+                # Update website context with current page info
+                page_context = website_context.copy()
+                page_context.update({
+                    'current_page_url': page_result['url'],
+                    'current_page_title': page_result['page_title'],
+                    'navigation_depth': page_result['depth']
+                })
 
-            # Update website context with current page info
-            page_context = website_context.copy() if website_context else {}
-            page_context.update({
-                'current_page_url': page_result['url'],
-                'current_page_title': page_result['page_title'],
-                'navigation_depth': page_result['depth']
-            })
-
-            # Analyze elements for this page
-            page_test_cases = analyzer.analyze_elements(page_result['elements'], page_context)
-            all_test_cases.extend(page_test_cases)
+                # Analyze elements for this page
+                page_test_cases = analyzer.analyze_elements(elements, page_context)
+                all_test_cases.extend(page_test_cases)
 
         logger.info(f"Generated {len(all_test_cases)} test cases across {crawl_result['total_pages_scanned']} pages")
 
@@ -125,13 +143,13 @@ def process_url(job_id: str, url: str, auth: dict = None, website_context: dict 
         result = AnalysisResult(
             source_url=url,
             analysis_timestamp=datetime.utcnow(),
-            page_title=main_page_title or "Multiple Pages Analyzed",
+            page_title=main_page_title,
             identified_elements=all_elements,
             generated_test_cases=all_test_cases,
             website_context={
                 **website_context,
                 'total_pages_scanned': crawl_result['total_pages_scanned'],
-                'scanned_urls': list(crawl_result.get('scanned_urls', []))
+                'scanned_urls': crawl_result['scanned_urls']
             }
         )
 
@@ -145,14 +163,16 @@ def process_url(job_id: str, url: str, auth: dict = None, website_context: dict 
                 'status': JobStatus.COMPLETED,
                 'updated_at': datetime.utcnow(),
                 'result': result.dict(),
-                'documentation': documentation
+                'documentation': documentation,
+                'page_map': page_map,  # Store the initial page map for reference
+                'scan_strategy': scan_strategy_obj.dict()  # Store the strategy for reference
             }}
         )
 
         return job_id
 
     except Exception as e:
-        logger.error(f"Error processing job {job_id}: {str(e)}")
+        logger.error(f"Error processing job {job_id}: {str(e)}", exc_info=True)
         # Update job with error
         jobs_collection.update_one(
             {'_id': job_id},

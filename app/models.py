@@ -14,6 +14,7 @@ class AuthConfig(BaseModel):
     password: Optional[str] = None
     token: Optional[str] = None
     token_type: Optional[str] = None  # "cookie" or "bearer"
+    cookie: Optional[Dict[str, str]] = None
 
 class JobRequest(BaseModel):
     url: HttpUrl
@@ -27,13 +28,32 @@ class JobStatus(str, Enum):
     COMPLETED = "completed"
     FAILED = "failed"
 
+class Position(BaseModel):
+    x: float
+    y: float
+    width: float
+    height: float
+
+class ElementContext(BaseModel):
+    parents: List[Dict[str, Any]] = []
+    siblings: List[Dict[str, Any]] = []
+
+class ElementMetadata(BaseModel):
+    collection: str
+    context: Optional[ElementContext] = None
+    visibility: Dict[str, Any] = {}
+    has_interactive_children: bool = False
+    is_navigational: bool = False
+    child_count: int = 0
+
 class UIElement(BaseModel):
     element_id: str
     element_type: str
     selector: str
-    attributes: Dict[str, str]
+    attributes: Dict[str, Any] = {}
     visible_text: Optional[str] = None
     position: Optional[Dict[str, float]] = None
+    metadata: ElementMetadata
     page_url: Optional[str] = None  # URL of the page where the element was found
     page_title: Optional[str] = None  # Title of the page where the element was found
 
@@ -52,6 +72,12 @@ class TestCase(BaseModel):
     steps: List[TestStep]
     related_element_id: Optional[str] = None
     feature_tested: Optional[str] = None  # Added to match analyzer's parsing ability
+    title: str
+    expected_results: List[str]
+    element_id: str
+    element_type: str
+    tags: List[str] = []
+    metadata: Dict[str, Any] = {}
 
 class AnalysisResult(BaseModel):
     source_url: str
@@ -73,12 +99,5 @@ class ScanStrategy(BaseModel):
     focus_areas: List[str]
     target_elements_description: List[Dict[str, Any]]
     max_pages_to_scan: int = 5  # Default limit to prevent infinite crawling
-    page_navigation_rules: Optional[List[Dict[str, Any]]] = None  # Rules for navigating between pages
+    page_navigation_rules: List[Dict[str, Any]] = []
     scan_depth: int = 1  # How many levels deep to scan from the initial page
-
-class PageNavigationRule(BaseModel):
-    source_page: str  # URL or identifier of the source page
-    target_pattern: str  # URL pattern or identifier of the target page
-    navigation_element: Dict[str, Any]  # Element to click/interact with to navigate
-    wait_for_element: Optional[str] = None  # Element to wait for on the target page
-    required_for_flow: bool = False  # Whether this navigation is required for the test flow
