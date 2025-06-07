@@ -1,5 +1,5 @@
 from playwright.async_api import Page
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any, Optional, Set, Tuple
 from datetime import datetime
 import logging
 from .models import ElementMapEntry, PageElementMap, ElementState, ElementRelation
@@ -16,6 +16,8 @@ class ElementMapper:
     
     def __init__(self):
         self.seen_elements = set()  # Track unique elements
+        self.functional_groups = {}  # Maps group_id to list of related elements
+        self.element_scores = {}  # Stores importance scores for elements
         
     def _clean_selector(self, selector: str) -> str:
         """Clean up selector to be more readable and maintainable."""
@@ -33,6 +35,117 @@ class ElementMapper:
                 return id_part.group()
         
         return selector.strip()
+
+    def _calculate_element_score(self, element: ElementMapEntry) -> float:
+        """Calculate an importance score for an element based on various factors."""
+        score = 0.0
+        
+        # Base scores for element types
+        type_scores = {
+            'button': 3.0,
+            'a': 3.0,
+            'input': 2.5,
+            'select': 2.5,
+            'textarea': 2.5,
+            'form': 2.0,
+            'div': 1.0,
+            'span': 1.0
+        }
+        score += type_scores.get(element.element_type.lower(), 1.0)
+        
+        # Boost score for elements with important attributes
+        if element.attributes.get('id'):
+            score += 1.0
+        if element.attributes.get('data-testid'):
+            score += 1.5
+        if element.attributes.get('name'):
+            score += 0.5
+        if element.attributes.get('role'):
+            score += 1.0
+        
+        # Boost for interactive elements
+        if element.interaction_type and element.interaction_type != 'unknown':
+            score += 2.0
+            
+        # Boost for accessibility
+        if element.accessibility.get('ariaLabel'):
+            score += 1.0
+        if element.accessibility.get('role'):
+            score += 1.0
+            
+        # Penalty for hidden elements
+        if element.state == ElementState.HIDDEN:
+            score *= 0.5
+            
+        return score
+
+    def _are_elements_functionally_equivalent(self, elem1: ElementMapEntry, elem2: ElementMapEntry) -> bool:
+        """Determine if two elements are functionally equivalent."""
+        # If elements have different interaction types, they're not equivalent
+        if elem1.interaction_type != elem2.interaction_type:
+            return False
+            
+        # Check for position overlap
+        if elem1.position and elem2.position:
+            pos1, pos2 = elem1.position, elem2.position
+            overlap = (
+                pos1['x'] < pos2['x'] + pos2['width'] and
+                pos1['x'] + pos1['width'] > pos2['x'] and
+                pos1['y'] < pos2['y'] + pos2['height'] and
+                pos1['y'] + pos1['height'] > pos2['y']
+            )
+            if not overlap:
+                return False
+                
+        # Check for text similarity
+        if elem1.visible_text and elem2.visible_text:
+            if elem1.visible_text.strip() != elem2.visible_text.strip():
+                return False
+                
+        # Check for shared important attributes
+        important_attrs = ['id', 'name', 'data-testid', 'href']
+        for attr in important_attrs:
+            val1 = elem1.attributes.get(attr)
+            val2 = elem2.attributes.get(attr)
+            if val1 and val2 and val1 != val2:
+                return False
+                
+        # Check parent-child relationship
+        if elem1.relations.parent_id == elem2.element_id or elem2.relations.parent_id == elem1.element_id:
+            return True
+            
+        return True
+
+    def _group_related_elements(self, elements: List[ElementMapEntry]) -> Dict[str, List[ElementMapEntry]]:
+        """Group elements that are functionally related."""
+        groups = {}
+        processed = set()
+        
+        for i, elem1 in enumerate(elements):
+            if elem1.element_id in processed:
+                continue
+                
+            group = [elem1]
+            processed.add(elem1.element_id)
+            
+            for elem2 in elements[i+1:]:
+                if elem2.element_id not in processed and self._are_elements_functionally_equivalent(elem1, elem2):
+                    group.append(elem2)
+                    processed.add(elem2.element_id)
+                    
+            if group:
+                group_id = f"group_{len(groups)}"
+                groups[group_id] = sorted(group, key=lambda x: self._calculate_element_score(x), reverse=True)
+                
+        return groups
+
+    def _select_best_element_from_group(self, group: List[ElementMapEntry]) -> ElementMapEntry:
+        """Select the most appropriate element from a group of related elements."""
+        if not group:
+            return None
+            
+        # Sort by score and return the highest scoring element
+        return max(group, key=lambda x: self._calculate_element_score(x))
 
     def _is_duplicate_element(self, element: ElementMapEntry) -> bool:
         """Check if this element is a duplicate based on key properties."""
@@ -74,8 +187,10 @@ class ElementMapper:
         """Creates a comprehensive map of all interactive elements on the page."""
         logger.info(f"Creating element map for page: {page.url}")
         
-        # Reset seen elements for new page
+        # Reset tracking variables
         self.seen_elements = set()
+        self.functional_groups = {}
+        self.element_scores = {}
         
         # Get all interactive elements
         elements = await self._get_all_interactive_elements(page)
@@ -84,10 +199,8 @@ class ElementMapper:
         element_entries = []
         for element in elements:
             entry = await self._create_element_entry(element, page)
-            if entry and self._should_include_element(entry) and not self._is_duplicate_element(entry):
-                # Clean up the selector
+            if entry and self._should_include_element(entry):
                 entry.selector = self._clean_selector(entry.selector)
-                # Clean up empty or None values
                 entry.attributes = {k: v for k, v in entry.attributes.items() if v}
                 entry.accessibility = {k: v for k, v in entry.accessibility.items() if v is not None}
                 if not entry.visible_text:
@@ -97,13 +210,23 @@ class ElementMapper:
         # Build relationships between elements
         await self._build_element_relationships(element_entries, page)
         
+        # Group related elements and select the best representatives
+        groups = self._group_related_elements(element_entries)
+        
+        # Select best elements from each group
+        final_elements = []
+        for group in groups.values():
+            best_element = self._select_best_element_from_group(group)
+            if best_element:
+                final_elements.append(best_element)
+        
         # Sort elements by position and visibility
-        element_entries.sort(
+        final_elements.sort(
             key=lambda x: (
-                x.state != ElementState.VISIBLE,  # Visible elements first
-                not x.position,  # Elements with position info first
-                x.position.get('y', float('inf')) if x.position else float('inf'),  # Sort by Y position
-                x.position.get('x', float('inf')) if x.position else float('inf')  # Then by X position
+                x.state != ElementState.VISIBLE,
+                not x.position,
+                x.position.get('y', float('inf')) if x.position else float('inf'),
+                x.position.get('x', float('inf')) if x.position else float('inf')
             )
         )
         
@@ -111,7 +234,7 @@ class ElementMapper:
             url=page.url,
             timestamp=datetime.utcnow(),
             title=await page.title(),
-            elements=element_entries
+            elements=final_elements
         )
     
     async def _get_all_interactive_elements(self, page: Page) -> List[Any]:

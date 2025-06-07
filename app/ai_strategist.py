@@ -1,11 +1,13 @@
 import os
 from openai import OpenAI 
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Set
 import logging
 import json
 from dotenv import load_dotenv
-from .models import ScanStrategy, PageElementMap
+from .models import ScanStrategy, PageElementMap, TestCase, ElementMapEntry
 from pydantic import ValidationError
+import itertools
+from collections import defaultdict
 
 
 load_dotenv()
@@ -19,6 +21,94 @@ class AIStrategist:
             logger.error("OPEN_API_KEY environmental variable is not set")
             raise ValueError("OPEN_API_KEY environmental variable is not set")
         self.client = OpenAI(api_key=self.api_key)
+        self.test_case_cache = {}  # Cache to store generated test cases
+        
+    def _calculate_test_similarity(self, test1: TestCase, test2: TestCase) -> float:
+        """Calculate similarity score between two test cases."""
+        similarity = 0.0
+        
+        # Compare titles (30% weight)
+        from difflib import SequenceMatcher
+        title_similarity = SequenceMatcher(None, test1.test_case_title, test2.test_case_title).ratio()
+        similarity += 0.3 * title_similarity
+        
+        # Compare steps (50% weight)
+        steps_similarity = 0.0
+        if test1.steps and test2.steps:
+            total_comparisons = 0
+            for step1, step2 in itertools.zip_longest(test1.steps, test2.steps):
+                if step1 and step2:
+                    action_similarity = SequenceMatcher(None, step1.action, step2.action).ratio()
+                    result_similarity = SequenceMatcher(None, step1.expected_result, step2.expected_result).ratio()
+                    steps_similarity += (action_similarity + result_similarity) / 2
+                    total_comparisons += 1
+            if total_comparisons > 0:
+                steps_similarity /= total_comparisons
+        similarity += 0.5 * steps_similarity
+        
+        # Compare related elements (20% weight)
+        element_similarity = 1.0 if test1.related_element_id == test2.related_element_id else 0.0
+        similarity += 0.2 * element_similarity
+        
+        return similarity
+
+    def _deduplicate_test_cases(self, test_cases: List[TestCase], similarity_threshold: float = 0.85) -> List[TestCase]:
+        """Remove duplicate or highly similar test cases."""
+        unique_tests = []
+        groups = defaultdict(list)  # Group similar test cases
+        
+        # First pass: Group by feature tested
+        for test in test_cases:
+            feature_key = test.feature_tested or 'unknown'
+            groups[feature_key].append(test)
+            
+        # Second pass: Within each feature group, find unique test cases
+        for feature_group in groups.values():
+            processed = set()
+            for i, test1 in enumerate(feature_group):
+                if i in processed:
+                    continue
+                    
+                similar_tests = [test1]
+                for j, test2 in enumerate(feature_group[i+1:], i+1):
+                    if j not in processed:
+                        similarity = self._calculate_test_similarity(test1, test2)
+                        if similarity >= similarity_threshold:
+                            similar_tests.append(test2)
+                            processed.add(j)
+                            
+                # Select the most comprehensive test case from the similar group
+                if similar_tests:
+                    best_test = max(similar_tests, key=lambda t: len(t.steps))
+                    unique_tests.append(best_test)
+                processed.add(i)
+                
+        return unique_tests
+
+    def _optimize_test_cases(self, test_cases: List[TestCase], element_map: PageElementMap) -> List[TestCase]:
+        """Optimize test cases by removing redundancy and improving coverage."""
+        # Step 1: Group test cases by feature and functionality
+        feature_groups = defaultdict(list)
+        for test in test_cases:
+            feature_key = test.feature_tested or 'unknown'
+            feature_groups[feature_key].append(test)
+            
+        optimized_tests = []
+        
+        for feature, tests in feature_groups.items():
+            # Step 2: Remove duplicate test cases
+            unique_tests = self._deduplicate_test_cases(tests)
+            
+            # Step 3: Sort by priority and complexity
+            unique_tests.sort(key=lambda t: (
+                t.priority,
+                -len(t.steps),  # More complex tests first within same priority
+                t.test_case_title
+            ))
+            
+            optimized_tests.extend(unique_tests)
+            
+        return optimized_tests
 
     def create_llm_messages(self, user_prompt: str, url: str, website_content: Dict[str, Any] = None, element_map: Optional[PageElementMap] = None, existing_website_context: Optional[Dict[str, Any]] = None) -> List[Dict[str, str]]:
         """
@@ -125,8 +215,17 @@ class AIStrategist:
         """
         llm_res = self.prompt_formulation(user_prompt, url, website_content, element_map, existing_website_context)
         parsed_strategy = self.parse_llm_response_to_strategy(llm_res)
+        
+        if parsed_strategy and element_map:
+            # Cache the strategy and element map for later test case optimization
+            strategy_key = f"{url}_{hash(user_prompt)}"
+            self.test_case_cache[strategy_key] = {
+                'strategy': parsed_strategy,
+                'element_map': element_map
+            }
+            
         return parsed_strategy
-    
+
     def prompt_formulation(self, user_prompt: str, url: str, website_content: Optional[Dict[str, Any]] = None, element_map: Optional[PageElementMap] = None, existing_website_context: Optional[Dict[str, Any]] = None) -> str:
         """
         Calls the LLM with the constructed prompt and returns the strategy content string.
@@ -167,7 +266,20 @@ class AIStrategist:
         except Exception as e:
             logger.error(f"An unexpected error occurred during parsing: {e}", exc_info=True)
             return None
-    
+
+    def optimize_test_cases(self, test_cases: List[TestCase], url: str, user_prompt: str) -> List[TestCase]:
+        """
+        Public method to optimize a set of test cases using cached information.
+        """
+        strategy_key = f"{url}_{hash(user_prompt)}"
+        cached_data = self.test_case_cache.get(strategy_key)
+        
+        if cached_data and cached_data['element_map']:
+            return self._optimize_test_cases(test_cases, cached_data['element_map'])
+        
+        # If no cache is available, just deduplicate
+        return self._deduplicate_test_cases(test_cases)
+
 
 if __name__ == "__main__":
     """Test function to demonstrate the AIStrategist functionality"""
