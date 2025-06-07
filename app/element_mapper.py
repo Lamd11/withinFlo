@@ -240,6 +240,7 @@ class ElementMapper:
     async def _get_all_interactive_elements(self, page: Page) -> List[Any]:
         """
         Gets all potentially interactive elements on the page.
+        First tries to find elements within the requested component context, then falls back to all interactive elements.
         """
         return await page.query_selector_all("""
             button, 
@@ -260,7 +261,77 @@ class ElementMapper:
             [onsubmit],
             form
         """)
-    
+
+    async def _identify_component_context(self, element: Any) -> Dict[str, str]:
+        """
+        Identifies the component context of an element by analyzing its parent structure.
+        Returns a dictionary of identified contexts.
+        """
+        return await element.evaluate("""el => {
+            const contexts = {};
+            let current = el;
+            
+            // Helper function to identify common component patterns
+            const identifyComponent = (element) => {
+                const tag = element.tagName.toLowerCase();
+                const id = element.id?.toLowerCase() || '';
+                const classes = Array.from(element.classList).join(' ').toLowerCase();
+                const role = element.getAttribute('role')?.toLowerCase();
+                
+                // Check for common component patterns
+                const patterns = {
+                    'navigation': ['nav', 'navbar', 'menu', 'navigation'],
+                    'form': ['form', 'input-group', 'form-group'],
+                    'modal': ['modal', 'dialog', 'popup'],
+                    'sidebar': ['sidebar', 'side-nav', 'drawer'],
+                    'header': ['header', 'banner'],
+                    'footer': ['footer'],
+                    'card': ['card'],
+                    'list': ['list'],
+                    'table': ['table', 'grid'],
+                    'tab': ['tab', 'tabs'],
+                    'accordion': ['accordion', 'collapse'],
+                    'dropdown': ['dropdown', 'select'],
+                    'search': ['search'],
+                    'pagination': ['pagination', 'pager'],
+                    'breadcrumb': ['breadcrumb'],
+                    'alert': ['alert', 'notification'],
+                    'tooltip': ['tooltip'],
+                    'carousel': ['carousel', 'slider'],
+                };
+                
+                for (const [component, keywords] of Object.entries(patterns)) {
+                    if (
+                        keywords.some(keyword => 
+                            tag === keyword ||
+                            id.includes(keyword) ||
+                            classes.includes(keyword) ||
+                            role === keyword
+                        )
+                    ) {
+                        return component;
+                    }
+                }
+                return null;
+            };
+            
+            // Traverse up the DOM tree to find component contexts
+            while (current && current !== document.body) {
+                const componentType = identifyComponent(current);
+                if (componentType && !contexts[componentType]) {
+                    contexts[componentType] = {
+                        type: componentType,
+                        id: current.id || undefined,
+                        class: current.className || undefined,
+                        role: current.getAttribute('role') || undefined
+                    };
+                }
+                current = current.parentElement;
+            }
+            
+            return contexts;
+        }""")
+
     async def _create_element_entry(self, element: Any, page: Page) -> Optional[ElementMapEntry]:
         """
         Creates a detailed entry for a single element.
@@ -268,6 +339,9 @@ class ElementMapper:
         try:
             # Basic element properties
             element_type = await element.evaluate("el => el.tagName.toLowerCase()")
+            
+            # Identify component contexts
+            component_contexts = await self._identify_component_context(element)
             
             # Generate a unique selector
             selector = await self._generate_unique_selector(element)
@@ -283,6 +357,10 @@ class ElementMapper:
                 }
                 return attrs;
             }""")
+            
+            # Add component context information to attributes
+            if component_contexts:
+                attributes['component_contexts'] = component_contexts
             
             # Get element position
             position = await element.bounding_box()

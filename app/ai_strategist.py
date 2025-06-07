@@ -143,17 +143,50 @@ class AIStrategist:
                 context_parts.append(f"\nPage Content Preview:\n{text_content}")
 
         if element_map:
-            context_parts.append("\nDetailed Element Map:")
+            # Group elements by their component contexts
+            component_groups = {}
+            ungrouped_elements = []
+            
             for element in element_map.elements:
-                element_desc = [
-                    f"\nElement: {element.element_type} ({element.interaction_type})",
-                    f"Selector: {element.selector}",
-                    f"Text: {element.visible_text if element.visible_text else 'N/A'}",
-                    f"State: {element.state}",
-                ]
-                if element.accessibility:
-                    element_desc.append(f"Accessibility: {json.dumps(element.accessibility)}")
-                context_parts.extend(element_desc)
+                contexts = element.attributes.get('component_contexts', {})
+                if contexts:
+                    for context_type, context_info in contexts.items():
+                        if context_type not in component_groups:
+                            component_groups[context_type] = []
+                        component_groups[context_type].append((element, context_info))
+                else:
+                    ungrouped_elements.append(element)
+            
+            # Add component-grouped elements to context
+            if component_groups:
+                context_parts.append("\nComponent-Grouped Elements:")
+                for component_type, elements in component_groups.items():
+                    context_parts.append(f"\n{component_type.title()} Component Elements:")
+                    for element, context_info in elements:
+                        element_desc = [
+                            f"\nElement: {element.element_type} ({element.interaction_type})",
+                            f"Selector: {element.selector}",
+                            f"Text: {element.visible_text if element.visible_text else 'N/A'}",
+                            f"State: {element.state}",
+                            f"Context Info: {json.dumps(context_info)}"
+                        ]
+                        if element.accessibility:
+                            element_desc.append(f"Accessibility: {json.dumps(element.accessibility)}")
+                        context_parts.extend(element_desc)
+            
+            # Add ungrouped elements
+            if ungrouped_elements:
+                context_parts.append("\nStandalone Interactive Elements:")
+                for element in ungrouped_elements:
+                    element_desc = [
+                        f"\nElement: {element.element_type} ({element.interaction_type})",
+                        f"Selector: {element.selector}",
+                        f"Text: {element.visible_text if element.visible_text else 'N/A'}",
+                        f"State: {element.state}",
+                    ]
+                    if element.accessibility:
+                        element_desc.append(f"Accessibility: {json.dumps(element.accessibility)}")
+                    context_parts.extend(element_desc)
         
         if existing_website_context:
             context_str = json.dumps(existing_website_context)
@@ -166,8 +199,15 @@ class AIStrategist:
         Your task is to analyze the user's request, the target URL, and the provided page content, element map, and context.
         Based on this, formulate a focused 'scan strategy' for a web crawler that specifically addresses the user's needs.
         
-        You have been provided with a detailed map of all interactive elements on the page.
+        You have been provided with a detailed map of all interactive elements on the page, grouped by their component contexts.
         Use this information to create a precise strategy that targets the exact elements needed.
+        
+        When dealing with component-specific requests:
+        1. Identify the relevant component type from the user's request
+        2. Focus primarily on elements within that component's context
+        3. Consider the component's structure and hierarchy
+        4. Include related elements that are functionally part of the component
+        5. Consider the relationships between different components if relevant
         
         The strategy should specify which elements or types of elements the crawler should focus on to fulfill the user's request.
         DO NOT generate test cases or documentation - focus only on identifying the relevant elements to scan.
@@ -182,7 +222,8 @@ class AIStrategist:
               "attributes": {{"attr_name": "value"}},
               "text_contains": "some text",
               "purpose": "brief description of element's role in the user's goal",
-              "selector": "exact_selector_from_element_map"  # Use this when possible
+              "selector": "exact_selector_from_element_map",  # Use this when possible
+              "component_context": "component_type"  # Include when relevant
             }}
           ]
         }}
@@ -202,6 +243,7 @@ class AIStrategist:
 
         Please generate a focused scan strategy JSON that will help find ONLY the elements needed for the user's specific request.
         Prefer using exact selectors from the element map when they match the needed elements.
+        Consider the component context of elements when relevant to the request.
         """
         
         return [

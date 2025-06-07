@@ -184,7 +184,7 @@ class ElementMapEntry(BaseModel):
     element_id: str
     element_type: str
     selector: str
-    attributes: Dict[str, str]
+    attributes: Dict[str, Any]
     visible_text: Optional[str] = None
     position: Optional[Dict[str, float]] = None
     state: ElementState = ElementState.VISIBLE
