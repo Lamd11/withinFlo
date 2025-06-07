@@ -1,6 +1,7 @@
 from typing import List, Dict, Any
 from openai import OpenAI
 from .models import UIElement, TestCase, TestStep # Assuming TestStep might be used later if parsing full steps
+from .test_case_deduplicator import TestCaseDeduplicator
 import logging
 import os
 from datetime import datetime
@@ -20,6 +21,7 @@ class TestCaseAnalyzer:
             logger.error("OPENAI_API_KEY environment variable is not set. (load_dotenv is commented out)")
             raise ValueError("OPENAI_API_KEY environment variable is not set. (load_dotenv is commented out)")
         self.client = OpenAI(api_key=self.api_key)
+        self.deduplicator = TestCaseDeduplicator()
 
     def _generate_test_case_prompt(self, element: UIElement, website_context: Dict[str, Any] = None) -> str:
         """
@@ -163,16 +165,18 @@ If the element is very generic (e.g. a 'div' with no clear text), try to infer i
             raise
 
     def analyze_elements(self, elements: List[UIElement], website_context: Dict[str, Any] = None) -> List[TestCase]:
+        # First, deduplicate elements
+        unique_elements = self.deduplicator.filter_elements(elements)
+        logger.info(f"Processing {len(unique_elements)} unique elements after deduplication")
+        
         test_cases = []
-        for i, element in enumerate(elements):
-            logger.info(f"Processing element {i+1}/{len(elements)}: {element.element_id} ({element.selector})")
+        for i, element in enumerate(unique_elements):
+            logger.info(f"Processing element {i+1}/{len(unique_elements)}: {element.element_id} ({element.selector})")
             try:
-                # Pass the website_context to analyze_element
                 test_case = self.analyze_element(element, website_context)
                 test_cases.append(test_case)
-            except Exception as e: # Catching broader exceptions from analyze_element
+            except Exception as e:
                 logger.warning(f"Failed to generate test case for element {element.element_id} ({element.selector}) due to: {str(e)}. Skipping this element.")
-                # Optionally, create a placeholder error TestCase:
-                # test_cases.append(TestCase(test_case_id=f"ERROR_TC_{element.element_id}", ... , description=f"Failed to generate: {str(e)}"))
-                continue # Continue with the next element
+                continue
+                
         return test_cases
