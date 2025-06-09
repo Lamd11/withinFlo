@@ -64,39 +64,75 @@ class AIStrategist:
                             content_summary += f"- {elem_type}: {', '.join(desc_parts)}\n"
         
         system_message_content = f"""
-        You are an expert QA Analyst and Web Interaction Strategist.
-        Your task is to analyze the user's request, the provided URL, any page context, and the ACTUAL PAGE CONTENT to create a precise, targeted 'scan strategy' to guide a web crawler.
+        You are an expert QA Analyst and Web Interaction Strategist specializing in semantic element detection.
+        Your task is to analyze any natural language request and generate comprehensive, flexible search strategies.
         
-        IMPORTANT: You now have access to the actual elements on the page. Use this information to make informed decisions rather than guessing.
+        **IMPORTANT: You have access to the actual page content extracted by advanced Playwright crawling.**
+        **Use this real data to make informed decisions rather than guessing.**
         
-        Your scan strategy must:
-            1. **Use the provided page elements** to identify the most relevant elements for the user's request.
-            2. For vague requests (e.g., "about button"), search through the provided elements to find the best semantic matches:
-               - Look for text containing "about", "our story", "company", etc.
-               - Consider navigation elements that might lead to about pages
-               - Use partial matches and semantic similarity
-            3. Prioritize elements that directly match the user's intent based on the actual page content.
-            4. If no exact match is found, select the closest semantic matches from the available elements.
-            5. Focus on 1-3 most relevant elements to avoid overwhelming the crawler.
-            6. Always explain your reasoning in the 'purpose' field.
-            7. Base your 'type' and 'attributes' on what you see in the structured content, not assumptions.
-            8. If the user asks for something not present on the page, create a fallback strategy targeting the most relevant available elements.
+        **Core Principle**: Generate search criteria that can find elements semantically, using both the actual page content and intelligent semantic matching.
+        
+        **Your search strategy capabilities:**
+        1. **Semantic Keywords**: Generate related terms, synonyms, and variations based on what's actually on the page
+        2. **Content Patterns**: Use real URL patterns, text patterns, and content from the extracted page data  
+        3. **Element Types**: Suggest HTML elements based on what actually exists on the page
+        4. **Contextual Attributes**: Use actual attribute patterns found in the page content
+        
+        **Strategy for using real page data:**
+        1. **First, scan the provided page elements** to see if there are direct matches for the user's request
+        2. **If exact matches exist**, prioritize those and create targeted search criteria
+        3. **If no exact matches**, use semantic similarity with the closest available elements
+        4. **Always explain your reasoning** - why you chose specific elements or fell back to semantic matching
+        5. **BE SELECTIVE**: Generate focused criteria that target 1-3 high-quality elements, not broad searches
+        
+        **For ANY request, think about:**
+        - **What's actually on the page**: Look at the provided interactive and navigation elements
+        - **Direct matches**: Are there elements that directly match the request?
+        - **Semantic matches**: What elements are semantically similar if no direct match?
+        - **Quality over quantity**: Target specific, actionable elements (links, buttons) over containers
+        - **User intent**: What would the user actually want to interact with?
+        
+        **Generate strategies that are:**
+        - **Data-driven**: Based on what actually exists on the page
+        - **Selective**: Target specific, high-quality elements rather than broad searches  
+        - **Actionable**: Prioritize links, buttons, inputs over divs, spans, paragraphs
+        - **Focused**: Generate precise criteria that will find 1-3 relevant elements, not dozens
+        - **User-oriented**: Consider what a user would actually want to click or interact with
+        
+        **Important**: 
+        - Target actionable elements (links, buttons, forms) over content elements (divs, paragraphs)
+        - Use specific keywords from the actual page content when available
+        - Avoid overly broad semantic keywords that might match irrelevant content
+        - Focus on the user's primary intent, not every possible variation
+        
+        **Your scan strategy must:**
+            1. Avoid creating repetitive or overlapping test coverage.
+            2. Bundle similar interactions under a unified purpose (e.g., group multiple nav links into one navigational test case).
+            3. Minimize total test cases while maximizing functional coverage.
+            4. Prioritize elements that directly match the user's intent.
+            5. **AVOID DUPLICATES**: If multiple elements serve the same purpose (e.g., same link in nav and footer), choose only ONE - preferably the primary navigation instance.
+            6. Focus on 1-3 most relevant elements to avoid overwhelming the crawler.
+            7. Always explain your reasoning in the 'purpose' field.
+            8. **ONE ELEMENT PER USER INTENT**: For a single user request like "about button", generate only ONE target element description.
+            9. Only create multiple elements if they serve DISTINCTLY DIFFERENT purposes related to the user's goal.
 
         **Generate no more than 3 test cases unless additional elements serve distinct user goals.**
 
-        Respond ONLY with a valid JSON object structured according to the ScanStrategy model:
+        Respond ONLY with a valid JSON object:
         {{
-          "focus_areas": ["area1", "area2"],
+          "focus_areas": ["area_based_on_actual_content", "semantic_fallback_area"], 
           "target_elements_description": [
-            {{"type": "element_tag", "attributes": {{"attr_name": "value"}}, "text_contains": "some text", "purpose": "brief description of element's role in the user's goal and why it was selected from the available options"}},
-            // ... more element descriptions based on actual page content
+            {{
+              "semantic_keywords": ["terms_from_actual_page", "semantic_alternatives"],
+              "content_patterns": ["actual_text_found", "actual_urls_found", "semantic_patterns"],
+              "element_types": ["actual_elements_found", "semantic_alternatives"],
+              "attributes": {{"actual_attr": "contains"}},
+              "purpose": "Explanation of whether this targets actual page elements or uses semantic matching, and why"
+            }}
           ]
         }}
         
-        Ensure 'purpose' in 'target_elements_description' clearly explains:
-        1. How the element relates to the user's specific request
-        2. Why this element was chosen from the available page elements
-        3. What semantic connection was made if the request was vague
+        Generate 1-3 element descriptions that leverage real page data when available and semantic matching as fallback.
         """
 
         user_message_content = f"""

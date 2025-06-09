@@ -36,6 +36,11 @@ class TestCaseAnalyzer:
             if website_context.get("user_goal_on_page"): # e.g., "User is attempting to add a product to cart and proceed to checkout"
                 context_str += f"* Likely User Goal on this Page: {website_context['user_goal_on_page']}\n"
 
+        # Get location context and purposes
+        location_context = element.attributes.get('location_context', 'unknown')
+        purposes = element.attributes.get('purposes', '')
+        purposes_str = purposes if purposes else 'N/A'
+
         prompt = f"""As a QA expert, your task is to analyze the provided UI element and its context to generate a comprehensive, scenario-based test case in Markdown format.
 The goal is not just to test the element in isolation, but to identify a key user interaction, workflow, or "mini-feature" that this element is part of.
 Think about what a user would be trying to achieve by interacting with this element and what subsequent steps or verifications would be logical.
@@ -44,42 +49,43 @@ Think about what a user would be trying to achieve by interacting with this elem
 * Element Type: `{element.element_type}`
 * Selector: `{element.selector}`
 * Visible Text: `{element.visible_text if element.visible_text else "N/A"}`
+* Location: `{location_context}`
+* Purposes: `{purposes_str}`
 * Attributes: `{element.attributes}`
 {context_str}
 **Instructions for Test Case Generation:**
 
 1.  **Identify Feature/User Flow:** Based on the element and any provided context, determine a relevant user flow or feature to test. For example, if the element is an "Add to Cart" button, the feature is "Add Product to Cart and Verify Cart Update." If it's a username field, the flow could be "Successful User Login."
 2.  **Define Scope:** The test case should cover a focused scenario. This might involve a few steps: an action on the primary element, and then verification steps that might involve other related elements or system feedback.
-3.  **Test Case ID:** Construct a meaningful Test Case ID. Use the format: `TC_[FEATURE_ABBREVIATION]_[SCENARIO_DESCRIPTION_ABBREVIATION]_[SEQUENCE_NUMBER]`. For example: `TC_CART_ADD_VERIFY_001` or `TC_LOGIN_SUCCESS_001`. The AI should generate this based on the test case content.
+3.  **Test Case ID:** Construct a meaningful Test Case ID that includes the location context. Use the format: `TC_[LOCATION]_[FEATURE_ABBREVIATION]_[SEQUENCE_NUMBER]`. For example: `TC_NAV_ABOUT_001` or `TC_FOOTER_CONTACT_001`.
+4.  **Title:** Include the element's location in the title (e.g., "Verify About link in main navigation" or "Test Contact Us link in footer").
 5.  **Preconditions:** List specific conditions that must be true *before* starting the test steps.
 6.  **Actionable Steps:** Write clear, sequential steps. Each step must include an "Action" and an "Expected Result."
 7.  **Placeholder Data:** Use bracketed placeholders for dynamic data (e.g., `[Valid Username]`, `[Product Name]`, `[Test Item Price]`).
 
 **Output Format (Strict Markdown):**
 
-### Test Case ID: TC_[FEATURE_ABBREVIATION]_[SCENARIO_ABBREVIATION]_[NUMBER]
-* **Feature Tested:** [e.g., Guest Checkout, User Login, Add to Cart, Search Functionality]
-* **Title:** [Descriptive title, e.g., Verify successful guest checkout with one product and valid payment]
+### Test Case ID: TC_[LOCATION]_[FEATURE_ABBREVIATION]_[NUMBER]
+* **Feature Tested:** [e.g., Navigation - About Page Access (Main Nav), Contact Form Access (Footer)]
+* **Title:** [Descriptive title including location, e.g., Verify About link in main navigation]
 * **Type:** [End-to-End | Functional | Usability | Edge Case | Scenario-Based]
 * **Priority:** [High | Medium | Low]
-* **Description:** [Clear, concise description of the test case's objective and the user flow it covers.]
+* **Description:** [Clear, concise description of the test case's objective, including the element's location and the user flow it covers.]
 * **Preconditions:**
     * The user is on the [Page Name/URL where the primary element is located].
-    * [e.g., At least one product is available for purchase.]
-    * [e.g., User is not logged in (for a guest checkout test).]
+    * [e.g., The main navigation menu is visible and loaded.]
+    * [e.g., The footer section is visible.]
 * **Steps:**
-    1. **Action:** [e.g., Navigate to the product page for '[Product Name]']
-       **Expected Result:** [e.g., The product page for '[Product Name]' loads successfully.]
-    2. **Action:** [e.g., Click the '{element.visible_text if element.visible_text else element.element_type}' button (selector: `{element.selector}`)]
-       **Expected Result:** [e.g., A notification confirming '[Product Name] has been added to cart' appears. The cart icon updates to show 1 item.]
-    3. **Action:** [e.g., Click on the cart icon (`[selector_for_cart_icon]`) ]
-       **Expected Result:** [e.g., The shopping cart page loads, displaying '[Product Name]' with quantity 1.]
+    1. **Action:** [e.g., Locate the About link in the main navigation]
+       **Expected Result:** [e.g., The About link is visible in the main navigation menu]
+    2. **Action:** [e.g., Click the About link]
+       **Expected Result:** [e.g., The browser navigates to the About page]
     *--(Add more steps as needed to complete the scenario)--*
 
 ---
 Now, please generate the test case based on the Primary UI Element Details and any context provided above.
 Focus on generating a test case that represents a realistic user scenario involving this element.
-If the element is very generic (e.g. a 'div' with no clear text), try to infer its purpose from its attributes or common web patterns. If a meaningful multi-step scenario cannot be reasonably inferred, generate a focused functional test for the element itself, including potential interactions and expected states.
+Make sure to emphasize the element's location in the test case ID, title, and steps to clearly differentiate between similar elements in different locations.
 """
         return prompt
 
