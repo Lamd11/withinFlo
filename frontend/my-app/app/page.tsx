@@ -6,19 +6,21 @@ import UrlForm from './components/UrlForm';
 import ProgressTracker from './components/ProgressTracker';
 import ResultsViewer from './components/ResultsViewer';
 
+type Status = 'pending' | 'crawling' | 'analyzing' | 'generating' | 'completed' | 'failed';
+
 interface JobProgress {
   total_elements: number;
   processed_elements: number;
   total_test_cases: number;
   generated_test_cases: number;
-  current_phase: string;
+  current_phase: Status;
   phase_progress: number;
   logs: string[];
 }
 
 export default function Home() {
   const [jobId, setJobId] = useState<string | null>(null);
-  const [status, setStatus] = useState<'pending' | 'crawling' | 'analyzing' | 'generating' | 'completed' | 'failed'>('pending');
+  const [status, setStatus] = useState<Status>('pending');
   const [isLoading, setIsLoading] = useState(false);
   const [progress, setProgress] = useState<JobProgress>({
     total_elements: 0,

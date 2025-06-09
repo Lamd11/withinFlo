@@ -119,7 +119,7 @@ If the element is very generic (e.g. a 'div' with no clear text), try to infer i
         
         # Clean up the title by removing "Verify" prefix if it exists and capitalize first letter
         if data.get("test_case_title"):
-            title = re.sub(r'^Verify\s+', '', data["test_case_title"])
+            title = re.sub(r'^(?:Verify\s+|Verifies\s+|Verification\s+of\s+)', '', data["test_case_title"], flags=re.IGNORECASE)
             data["test_case_title"] = title[0].upper() + title[1:] if title else title
         
         # If a more specific title from "Feature Tested" is found, prefer it or combine

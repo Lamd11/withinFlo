@@ -21,6 +21,10 @@ import {
   AdjustmentsHorizontalIcon, // For filters
   DocumentTextIcon, // For Raw Markdown toggle
   ChartBarIcon, // For Stats
+  ArrowUpIcon,
+  ArrowDownIcon,
+  FunnelIcon,
+  ViewColumnsIcon,
 } from '@heroicons/react/24/solid'; // Or /24/outline
 
 // Your TestCase interface (remains the same)
@@ -71,6 +75,9 @@ const MarkdownRenderer = ({ content, inline = false, className = "" }: { content
   );
 };
 
+type SortField = 'title' | 'priority' | 'type' | 'feature';
+type SortDirection = 'asc' | 'desc';
+type GroupBy = 'none' | 'feature' | 'type' | 'priority';
 
 export default function TestCaseViewer({ markdown }: TestCaseViewerProps) {
   const [expandedTestCase, setExpandedTestCase] = useState<string | null>(null);
@@ -80,6 +87,10 @@ export default function TestCaseViewer({ markdown }: TestCaseViewerProps) {
   const [showRawMarkdown, setShowRawMarkdown] = useState<Record<string, boolean>>({});
   const [currentPage, setCurrentPage] = useState<number>(1);
   const itemsPerPage = 10;
+  const [sortField, setSortField] = useState<SortField>('title');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
+  const [groupBy, setGroupBy] = useState<GroupBy>('none');
+  const [isFilterMenuOpen, setIsFilterMenuOpen] = useState(false);
 
   // Your parseTestCases function (assuming it's working correctly to extract raw values)
   const parseTestCases = (markdown: string): TestCase[] => {
@@ -174,20 +185,67 @@ export default function TestCaseViewer({ markdown }: TestCaseViewerProps) {
 
   const testCases = parseTestCases(markdown);
   
-  const filteredTestCases = testCases.filter(testCase => {
-    const tcPriority = testCase.priority?.toLowerCase() || '';
-    const tcType = testCase.type?.toLowerCase() || '';
+  // Sort function
+  const sortTestCases = (a: TestCase, b: TestCase) => {
+    const direction = sortDirection === 'asc' ? 1 : -1;
+    switch (sortField) {
+      case 'priority':
+        const priorityOrder = { 'high': 0, 'medium': 1, 'low': 2 };
+        return direction * (
+          priorityOrder[a.priority.toLowerCase()] - priorityOrder[b.priority.toLowerCase()]
+        );
+      case 'title':
+        return direction * a.title.localeCompare(b.title);
+      case 'type':
+        return direction * a.type.localeCompare(b.type);
+      case 'feature':
+        return direction * a.feature.localeCompare(b.feature);
+      default:
+        return 0;
+    }
+  };
 
-    const matchesType = filterType === 'all' || tcType.includes(filterType.toLowerCase());
-    const matchesPriority = filterPriority === 'all' || tcPriority.includes(filterPriority.toLowerCase());
-    const matchesSearch = searchTerm === '' || 
-      testCase.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (testCase.description && testCase.description.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      testCase.feature.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (testCase.originalId && testCase.originalId.toLowerCase().includes(searchTerm.toLowerCase()));
+  // Filter and sort test cases
+  const filteredTestCases = testCases
+    .filter(testCase => {
+      const tcPriority = testCase.priority?.toLowerCase() || '';
+      const tcType = testCase.type?.toLowerCase() || '';
+      
+      const matchesType = filterType === 'all' || tcType.includes(filterType.toLowerCase());
+      const matchesPriority = filterPriority === 'all' || tcPriority.includes(filterPriority.toLowerCase());
+      const matchesSearch = searchTerm === '' || 
+        testCase.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        testCase.feature.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (testCase.description && testCase.description.toLowerCase().includes(searchTerm.toLowerCase()));
+      
+      return matchesType && matchesPriority && matchesSearch;
+    })
+    .sort(sortTestCases);
+
+  // Group test cases if grouping is enabled
+  const groupTestCases = (testCases: TestCase[]) => {
+    if (groupBy === 'none') return { 'All Test Cases': testCases };
     
-    return matchesType && matchesPriority && matchesSearch;
-  });
+    return testCases.reduce((groups: { [key: string]: TestCase[] }, testCase) => {
+      let groupKey = '';
+      switch (groupBy) {
+        case 'feature':
+          groupKey = testCase.feature || 'Uncategorized';
+          break;
+        case 'type':
+          groupKey = testCase.type || 'Uncategorized';
+          break;
+        case 'priority':
+          groupKey = testCase.priority || 'Uncategorized';
+          break;
+      }
+      if (!groups[groupKey]) groups[groupKey] = [];
+      groups[groupKey].push(testCase);
+      return groups;
+    }, {});
+  };
+
+  const groupedTestCases = groupTestCases(filteredTestCases);
   
   // Pagination logic
   const pageCount = Math.ceil(filteredTestCases.length / itemsPerPage);
@@ -288,50 +346,112 @@ export default function TestCaseViewer({ markdown }: TestCaseViewerProps) {
         <h2 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white text-center">Test Case Dashboard</h2>
       </header>
       
-      {/* Filters */}
-      <div className="mb-8 p-6 bg-white dark:bg-gray-800 rounded-lg shadow-md">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-end">
-          <div className="md:col-span-1">
-            <label htmlFor="search" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              <MagnifyingGlassIcon className="w-4 h-4 inline mr-1" /> Search
-            </label>
-            <input
-              type="text" id="search" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Search by ID, title, feature..."
-              className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
-            />
+      {/* Controls Bar */}
+      <div className="sticky top-0 z-10 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 p-4 mb-4">
+        <div className="flex flex-wrap gap-4 items-center justify-between">
+          {/* Search */}
+          <div className="flex-1 min-w-[200px]">
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="Search test cases..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 dark:bg-gray-800 dark:border-gray-700"
+              />
+              <MagnifyingGlassIcon className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
+            </div>
           </div>
-          
-          <div>
-            <label htmlFor="type-filter" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              <TagIcon className="w-4 h-4 inline mr-1" /> Type
-            </label>
-            <select id="type-filter" value={filterType} onChange={(e) => setFilterType(e.target.value)}
-              className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:text-white"
+
+          {/* Controls */}
+          <div className="flex gap-2">
+            {/* Sort Button */}
+            <div className="relative">
+              <button
+                onClick={() => setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc')}
+                className="px-3 py-2 border rounded-lg flex items-center gap-2 hover:bg-gray-50 dark:hover:bg-gray-800"
+              >
+                Sort by
+                {sortDirection === 'asc' ? (
+                  <ArrowUpIcon className="h-4 w-4" />
+                ) : (
+                  <ArrowDownIcon className="h-4 w-4" />
+                )}
+              </button>
+              <select
+                value={sortField}
+                onChange={(e) => setSortField(e.target.value as SortField)}
+                className="absolute inset-0 w-full opacity-0 cursor-pointer"
+              >
+                <option value="title">Title</option>
+                <option value="priority">Priority</option>
+                <option value="type">Type</option>
+                <option value="feature">Feature</option>
+              </select>
+            </div>
+
+            {/* Group By Button */}
+            <div className="relative">
+              <button className="px-3 py-2 border rounded-lg flex items-center gap-2 hover:bg-gray-50 dark:hover:bg-gray-800">
+                <ViewColumnsIcon className="h-4 w-4" />
+                Group by
+              </button>
+              <select
+                value={groupBy}
+                onChange={(e) => setGroupBy(e.target.value as GroupBy)}
+                className="absolute inset-0 w-full opacity-0 cursor-pointer"
+              >
+                <option value="none">None</option>
+                <option value="feature">Feature</option>
+                <option value="type">Type</option>
+                <option value="priority">Priority</option>
+              </select>
+            </div>
+
+            {/* Filter Button */}
+            <button
+              onClick={() => setIsFilterMenuOpen(!isFilterMenuOpen)}
+              className="px-3 py-2 border rounded-lg flex items-center gap-2 hover:bg-gray-50 dark:hover:bg-gray-800"
             >
-              {types.map((type) => (
-                <option key={type} value={type}>
-                  {type.charAt(0).toUpperCase() + type.slice(1)}
-                </option>
-              ))}
-            </select>
-          </div>
-          
-          <div>
-            <label htmlFor="priority-filter" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              <AdjustmentsHorizontalIcon className="w-4 h-4 inline mr-1" /> Priority
-            </label>
-            <select id="priority-filter" value={filterPriority} onChange={(e) => setFilterPriority(e.target.value)}
-              className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:text-white"
-            >
-              {priorities.map((priority) => (
-                <option key={priority} value={priority}>
-                  {priority.charAt(0).toUpperCase() + priority.slice(1)}
-                </option>
-              ))}
-            </select>
+              <FunnelIcon className="h-4 w-4" />
+              Filters
+            </button>
           </div>
         </div>
+
+        {/* Filter Menu */}
+        {isFilterMenuOpen && (
+          <div className="mt-4 p-4 border rounded-lg bg-white dark:bg-gray-800">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium mb-2">Type</label>
+                <select
+                  value={filterType}
+                  onChange={(e) => setFilterType(e.target.value)}
+                  className="w-full p-2 border rounded-md dark:bg-gray-700"
+                >
+                  <option value="all">All Types</option>
+                  {types.filter(t => t !== 'all').map(type => (
+                    <option key={type} value={type}>{type}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2">Priority</label>
+                <select
+                  value={filterPriority}
+                  onChange={(e) => setFilterPriority(e.target.value)}
+                  className="w-full p-2 border rounded-md dark:bg-gray-700"
+                >
+                  <option value="all">All Priorities</option>
+                  {priorities.filter(p => p !== 'all').map(priority => (
+                    <option key={priority} value={priority}>{priority}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
       
       {/* Stats */}
@@ -388,170 +508,164 @@ export default function TestCaseViewer({ markdown }: TestCaseViewerProps) {
       </div>
       
       {/* Test Cases List */}
-      <div className="space-y-6">
-        {currentItems.length > 0 ? (
-          currentItems.map((testCase) => (
-            <div 
-              key={testCase.id}
-              className={`bg-white dark:bg-gray-800 rounded-lg shadow-lg hover:shadow-xl transition-shadow duration-300 ease-in-out overflow-hidden `}
-            >
-              <div 
-                onClick={() => toggleTestCase(testCase.id)}
-                className="flex flex-col md:flex-row md:items-center justify-between p-4 sm:p-6 cursor-pointer border-b border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
-                role="button"
-                tabIndex={0}
-                aria-expanded={expandedTestCase === testCase.id}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    toggleTestCase(testCase.id);
-                  }
-                }}
-              >
-                <div className="flex-1 mb-3 md:mb-0">
-                  <div className="flex flex-wrap items-center gap-2 mb-2">
-                    <span className="text-xs font-mono px-2.5 py-1 rounded-full bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-200">
-                      {testCase.originalId || testCase.id}
-                    </span>
-                    <PriorityBadge priorityValue={testCase.priority} />
-                    <TypeBadge typeValue={testCase.type} />
+      <div className="space-y-8">
+        {Object.entries(groupedTestCases).map(([groupName, groupTestCases]) => (
+          <div key={groupName} className="space-y-4">
+            {groupBy !== 'none' && (
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4">
+                {groupName}
+              </h2>
+            )}
+            <div className="space-y-4">
+              {groupTestCases.map((testCase) => (
+                <div 
+                  key={testCase.id}
+                  className={`bg-white dark:bg-gray-800 rounded-lg shadow-lg hover:shadow-xl transition-shadow duration-300 ease-in-out overflow-hidden `}
+                >
+                  <div 
+                    onClick={() => toggleTestCase(testCase.id)}
+                    className="flex flex-col md:flex-row md:items-center justify-between p-4 sm:p-6 cursor-pointer border-b border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
+                    role="button"
+                    tabIndex={0}
+                    aria-expanded={expandedTestCase === testCase.id}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        toggleTestCase(testCase.id);
+                      }
+                    }}
+                  >
+                    <div className="flex-1 mb-3 md:mb-0">
+                      <div className="flex flex-wrap items-center gap-2 mb-2">
+                        <span className="text-xs font-mono px-2.5 py-1 rounded-full bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-200">
+                          {testCase.originalId || testCase.id}
+                        </span>
+                        <PriorityBadge priorityValue={testCase.priority} />
+                        <TypeBadge typeValue={testCase.type} />
+                      </div>
+                      <h3 className="text-xl font-semibold text-indigo-600 dark:text-indigo-400">{testCase.title || 'Untitled Test Case'}</h3>
+                      <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{testCase.feature || 'No Feature Specified'}</p>
+                    </div>
+                    <div className="flex-shrink-0">
+                      {expandedTestCase === testCase.id ? (
+                        <div 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleTestCase(testCase.id);
+                          }}
+                          className="cursor-pointer"
+                        >
+                          <ChevronUpIcon className="w-8 h-8 text-indigo-600 dark:text-indigo-400 p-1 bg-indigo-50 dark:bg-indigo-900/30 rounded-full" />
+                        </div>
+                      ) : (
+                        <div 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleTestCase(testCase.id);
+                          }}
+                          className="cursor-pointer"
+                        >
+                          <ChevronDownIcon className="w-8 h-8 text-gray-600 dark:text-gray-400 p-1 bg-gray-50 dark:bg-gray-700/50 rounded-full hover:bg-gray-100 dark:hover:bg-gray-600/50" />
+                        </div>
+                      )}
+                    </div>
                   </div>
-                  <h3 className="text-xl font-semibold text-indigo-600 dark:text-indigo-400">{testCase.title || 'Untitled Test Case'}</h3>
-                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{testCase.feature || 'No Feature Specified'}</p>
-                </div>
-                <div className="flex-shrink-0">
-                  {expandedTestCase === testCase.id ? (
-                    <div 
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        toggleTestCase(testCase.id);
-                      }}
-                      className="cursor-pointer"
-                    >
-                      <ChevronUpIcon className="w-8 h-8 text-indigo-600 dark:text-indigo-400 p-1 bg-indigo-50 dark:bg-indigo-900/30 rounded-full" />
-                    </div>
-                  ) : (
-                    <div 
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        toggleTestCase(testCase.id);
-                      }}
-                      className="cursor-pointer"
-                    >
-                      <ChevronDownIcon className="w-8 h-8 text-gray-600 dark:text-gray-400 p-1 bg-gray-50 dark:bg-gray-700/50 rounded-full hover:bg-gray-100 dark:hover:bg-gray-600/50" />
-                    </div>
-                  )}
-                </div>
-              </div>
-              
-              {expandedTestCase === testCase.id && (
-                <div className="p-4 sm:p-6 bg-gray-50 dark:bg-gray-800/50 animate-fadeIn">
                   
-                  <DetailSection title="Description" icon={InformationCircleIcon}>
-                    <MarkdownRenderer content={testCase.description || 'No description provided.'} className="text-gray-700 dark:text-gray-300" />
-                  </DetailSection>
-                  
-                  {testCase.preconditions && testCase.preconditions.length > 0 && (
-                    <DetailSection title="Preconditions" icon={ClipboardIcon}>
-                      <ul className="space-y-1">
-                        {testCase.preconditions.map((precondition, index) => (
-                          <li key={index} className="flex items-start">
-                            <CheckCircleIcon className="w-4 h-4 mr-2 mt-1 flex-shrink-0 text-green-500 dark:text-green-400" />
-                            <MarkdownRenderer content={precondition} inline={true} className="text-gray-700 dark:text-gray-300"/>
-                          </li>
-                        ))}
-                      </ul>
-                    </DetailSection>
-                  )}
-                  
-                  {testCase.primaryElement && (
-                    <DetailSection title="Element Under Test" icon={CubeIcon}>
-                      <div className="p-3 bg-indigo-50 dark:bg-indigo-900/30 rounded-md border border-indigo-200 dark:border-indigo-700">
-                        <p className="text-sm font-mono text-indigo-700 dark:text-indigo-300 break-all">
-                          <strong>Selector:</strong> {testCase.primaryElement.selector}
-                        </p>
-                        {testCase.primaryElement.purpose && (
-                          <div className="mt-2 text-sm text-indigo-600 dark:text-indigo-400">
-                             <strong>Purpose:</strong> <MarkdownRenderer content={testCase.primaryElement.purpose} inline={true} />
+                  {expandedTestCase === testCase.id && (
+                    <div className="p-4 sm:p-6 bg-gray-50 dark:bg-gray-800/50 animate-fadeIn">
+                      
+                      <DetailSection title="Description" icon={InformationCircleIcon}>
+                        <MarkdownRenderer content={testCase.description || 'No description provided.'} className="text-gray-700 dark:text-gray-300" />
+                      </DetailSection>
+                      
+                      {testCase.preconditions && testCase.preconditions.length > 0 && (
+                        <DetailSection title="Preconditions" icon={ClipboardIcon}>
+                          <ul className="space-y-1">
+                            {testCase.preconditions.map((precondition, index) => (
+                              <li key={index} className="flex items-start">
+                                <CheckCircleIcon className="w-4 h-4 mr-2 mt-1 flex-shrink-0 text-green-500 dark:text-green-400" />
+                                <MarkdownRenderer content={precondition} inline={true} className="text-gray-700 dark:text-gray-300"/>
+                              </li>
+                            ))}
+                          </ul>
+                        </DetailSection>
+                      )}
+                      
+                      {testCase.primaryElement && (
+                        <DetailSection title="Element Under Test" icon={CubeIcon}>
+                          <div className="p-3 bg-indigo-50 dark:bg-indigo-900/30 rounded-md border border-indigo-200 dark:border-indigo-700">
+                            <p className="text-sm font-mono text-indigo-700 dark:text-indigo-300 break-all">
+                              <strong>Selector:</strong> {testCase.primaryElement.selector}
+                            </p>
+                            {testCase.primaryElement.purpose && (
+                              <div className="mt-2 text-sm text-indigo-600 dark:text-indigo-400">
+                                 <strong>Purpose:</strong> <MarkdownRenderer content={testCase.primaryElement.purpose} inline={true} />
+                              </div>
+                            )}
                           </div>
+                        </DetailSection>
+                      )}
+                      
+                      {testCase.steps && testCase.steps.length > 0 && (
+                        <DetailSection title="Steps" icon={TableCellsIcon}>
+                          <div className="overflow-x-auto border border-gray-200 dark:border-gray-700 rounded-md">
+                            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                              <thead className="bg-gray-100 dark:bg-gray-700/50">
+                                <tr>
+                                  <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-12 sm:w-16">#</th>
+                                  <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Action</th>
+                                  <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Expected Result</th>
+                                </tr>
+                              </thead>
+                              <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                                {testCase.steps.map((step, index) => (
+                                  <tr key={step.number} className={index % 2 === 0 ? 'bg-white dark:bg-gray-800' : 'bg-gray-50 dark:bg-gray-800/60 hover:bg-gray-100 dark:hover:bg-gray-700/70'}>
+                                    <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-700 dark:text-gray-200 text-center">{step.number}</td>
+                                    <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300"><MarkdownRenderer content={step.action} /></td>
+                                    <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300"><MarkdownRenderer content={step.expectedResult} /></td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </DetailSection>
+                      )}
+                      
+                      {testCase.postconditions && testCase.postconditions.length > 0 && (
+                         <DetailSection title="Postconditions" icon={ClipboardDocumentCheckIcon}>
+                          <ul className="space-y-1">
+                            {testCase.postconditions.map((postcondition, index) => (
+                              <li key={index} className="flex items-start">
+                                <ShieldCheckIcon className="w-4 h-4 mr-2 mt-1 flex-shrink-0 text-blue-500 dark:text-blue-400" />
+                                <MarkdownRenderer content={postcondition} inline={true} className="text-gray-700 dark:text-gray-300"/>
+                              </li>
+                            ))}
+                          </ul>
+                        </DetailSection>
+                      )}
+
+                      {/* Raw Markdown Debug View */}
+                      <div className="mt-8 pt-4 border-t border-gray-300 dark:border-gray-700">
+                        <button 
+                          className="text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 flex items-center font-medium group"
+                          onClick={(e) => toggleRawMarkdown(testCase.id, e)}
+                        >
+                          <DocumentTextIcon className="w-4 h-4 mr-1.5 text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300" />
+                          Toggle Raw Markdown View
+                        </button>
+                        {showRawMarkdown[testCase.id] && (
+                          <pre className="mt-2 p-3 bg-gray-100 dark:bg-gray-800 rounded-md overflow-x-auto text-xs font-mono text-gray-800 dark:text-gray-200">
+                            {getTestCaseRawMarkdown(testCase.id)}
+                          </pre>
                         )}
                       </div>
-                    </DetailSection>
+                    </div>
                   )}
-                  
-                  {testCase.steps && testCase.steps.length > 0 && (
-                    <DetailSection title="Steps" icon={TableCellsIcon}>
-                      <div className="overflow-x-auto border border-gray-200 dark:border-gray-700 rounded-md">
-                        <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                          <thead className="bg-gray-100 dark:bg-gray-700/50">
-                            <tr>
-                              <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-12 sm:w-16">#</th>
-                              <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Action</th>
-                              <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Expected Result</th>
-                            </tr>
-                          </thead>
-                          <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                            {testCase.steps.map((step, index) => (
-                              <tr key={step.number} className={index % 2 === 0 ? 'bg-white dark:bg-gray-800' : 'bg-gray-50 dark:bg-gray-800/60 hover:bg-gray-100 dark:hover:bg-gray-700/70'}>
-                                <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-700 dark:text-gray-200 text-center">{step.number}</td>
-                                <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300"><MarkdownRenderer content={step.action} /></td>
-                                <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300"><MarkdownRenderer content={step.expectedResult} /></td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    </DetailSection>
-                  )}
-                  
-                  {testCase.postconditions && testCase.postconditions.length > 0 && (
-                     <DetailSection title="Postconditions" icon={ClipboardDocumentCheckIcon}>
-                      <ul className="space-y-1">
-                        {testCase.postconditions.map((postcondition, index) => (
-                          <li key={index} className="flex items-start">
-                            <ShieldCheckIcon className="w-4 h-4 mr-2 mt-1 flex-shrink-0 text-blue-500 dark:text-blue-400" />
-                            <MarkdownRenderer content={postcondition} inline={true} className="text-gray-700 dark:text-gray-300"/>
-                          </li>
-                        ))}
-                      </ul>
-                    </DetailSection>
-                  )}
-
-                  {/* Raw Markdown Debug View */}
-                  <div className="mt-8 pt-4 border-t border-gray-300 dark:border-gray-700">
-                    <button 
-                      className="text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 flex items-center font-medium group"
-                      onClick={(e) => toggleRawMarkdown(testCase.id, e)}
-                    >
-                      <DocumentTextIcon className="w-4 h-4 mr-1.5 text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300" />
-                      Toggle Raw Markdown View
-                    </button>
-                    {showRawMarkdown[testCase.id] && (
-                      <pre className="mt-2 p-3 bg-gray-100 dark:bg-gray-800 rounded-md overflow-x-auto text-xs font-mono text-gray-800 dark:text-gray-200">
-                        {getTestCaseRawMarkdown(testCase.id)}
-                      </pre>
-                    )}
-                  </div>
                 </div>
-              )}
+              ))}
             </div>
-          ))
-        ) : (
-          // ... No test cases found ...
-          <div className="text-center py-10">
-
-            <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-
-            </svg>
-
-            <h3 className="mt-2 text-sm font-medium text-gray-900 dark:text-white">No test cases found</h3>
-
-            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Try adjusting your search or filter criteria.</p>
-
           </div>
-        )}
+        ))}
       </div>
       
       {/* Pagination */}
