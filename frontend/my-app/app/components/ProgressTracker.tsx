@@ -14,10 +14,21 @@ interface JobProgress {
 }
 
 interface ProgressTrackerProps {
-  status: 'pending' | 'crawling' | 'analyzing' | 'generating' | 'completed' | 'failed';
-  progress: JobProgress;
+  status: Status;
+  progress: {
+    current_phase: Status;
+    phase_progress: number;
+    logs: string[];
+    processed_elements: number;
+    total_elements: number;
+    generated_test_cases: number;
+  };
   logs: string[];
 }
+
+// Add type definitions at the top of the file
+type Phase = 'queue' | 'crawling' | 'analysis' | 'complete';
+type Status = 'pending' | 'crawling' | 'analyzing' | 'generating' | 'completed' | 'failed';
 
 export default function ProgressTracker({ status, progress, logs }: ProgressTrackerProps) {
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -59,17 +70,70 @@ export default function ProgressTracker({ status, progress, logs }: ProgressTrac
   };
 
   const getProgressPercentage = () => {
+    // Each phase represents 25% of the total progress (4 phases total)
     switch (status) {
+      case 'pending':
+        // Queue phase (0-25%)
+        return 25; // When in queue, show progress up to queue completion
       case 'crawling':
-        return progress.phase_progress * 0.3;
+        // Crawling phase (25-50%)
+        return 25 + (progress.phase_progress * 0.25);
       case 'analyzing':
-        return 30 + (progress.phase_progress * 0.5);
+        // Analysis phase (50-75%)
+        return 50 + (progress.phase_progress * 0.25);
       case 'generating':
-        return 80 + (progress.phase_progress * 0.2);
+        // Completion phase (75-100%)
+        return 75 + (progress.phase_progress * 0.25);
       case 'completed':
         return 100;
+      case 'failed':
+        // Show progress up to the point of failure
+        switch (progress.current_phase) {
+          case 'pending':
+            return Math.min(25, progress.phase_progress);
+          case 'crawling':
+            return Math.min(50, 25 + (progress.phase_progress * 0.25));
+          case 'analyzing':
+            return Math.min(75, 50 + (progress.phase_progress * 0.25));
+          case 'generating':
+            return Math.min(100, 75 + (progress.phase_progress * 0.25));
+          default:
+            return progress.phase_progress;
+        }
       default:
         return 0;
+    }
+  };
+
+  // Update the status steps section to better reflect progress
+  const getStepStatus = (stepPhase: Phase) => {
+    const phases: Record<Phase, Status[]> = {
+      queue: ['pending'],
+      crawling: ['crawling'],
+      analysis: ['analyzing', 'generating'],
+      complete: ['completed']
+    };
+
+    if (status === 'completed' && stepPhase === 'complete') {
+      return 'complete';
+    } else if (status === 'failed') {
+      return phases[stepPhase].includes(progress.current_phase) ? 'current' : 
+             getProgressPercentage() >= getPhaseStartPercentage(stepPhase) ? 'complete' : 'pending';
+    } else if (phases[stepPhase].includes(status)) {
+      return 'current';
+    } else if (getProgressPercentage() >= getPhaseStartPercentage(stepPhase)) {
+      return 'complete';
+    }
+    return 'pending';
+  };
+
+  const getPhaseStartPercentage = (phase: Phase) => {
+    switch (phase) {
+      case 'queue': return 0;
+      case 'crawling': return 25;
+      case 'analysis': return 50;
+      case 'complete': return 75;
+      default: return 0;
     }
   };
 
@@ -102,73 +166,41 @@ export default function ProgressTracker({ status, progress, logs }: ProgressTrac
         {/* Progress bar */}
         <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5 mb-4">
           <div 
-            className="bg-indigo-600 h-2.5 rounded-full transition-all duration-300 ease-in-out"
+            className={`h-2.5 rounded-full transition-all duration-300 ease-in-out ${
+              status === 'failed' ? 'bg-red-600' : 'bg-indigo-600'
+            }`}
             style={{ width: `${getProgressPercentage()}%` }}
           ></div>
         </div>
 
         {/* Status steps */}
         <div className="flex justify-between mb-6">
-          <div className="flex flex-col items-center">
-            <div className={`w-6 h-6 flex items-center justify-center rounded-full ${
-              status !== 'pending' ? 'bg-indigo-600 text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400'
-            }`}>
-              {status !== 'pending' ? (
-                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"></path>
-                </svg>
-              ) : (
-                <span>1</span>
-              )}
-            </div>
-            <span className="text-xs mt-1">Queue</span>
-          </div>
-          <div className="flex flex-col items-center">
-            <div className={`w-6 h-6 flex items-center justify-center rounded-full ${
-              status === 'crawling' || status === 'analyzing' || status === 'generating' || status === 'completed' || status === 'failed' ? 'bg-indigo-600 text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400'
-            }`}>
-              {status === 'analyzing' || status === 'generating' || status === 'completed' || status === 'failed' ? (
-                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"></path>
-                </svg>
-              ) : (
-                <span>2</span>
-              )}
-            </div>
-            <span className="text-xs mt-1">Crawling</span>
-          </div>
-          <div className="flex flex-col items-center">
-            <div className={`w-6 h-6 flex items-center justify-center rounded-full ${
-              status === 'analyzing' || status === 'generating' || status === 'completed' || status === 'failed' ? 'bg-indigo-600 text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400'
-            }`}>
-              {status === 'generating' || status === 'completed' || status === 'failed' ? (
-                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"></path>
-                </svg>
-              ) : (
-                <span>3</span>
-              )}
-            </div>
-            <span className="text-xs mt-1">Analysis</span>
-          </div>
-          <div className="flex flex-col items-center">
-            <div className={`w-6 h-6 flex items-center justify-center rounded-full ${
-              status === 'completed' ? 'bg-green-600 text-white' : status === 'failed' ? 'bg-red-600 text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400'
-            }`}>
-              {status === 'completed' ? (
-                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"></path>
-                </svg>
-              ) : status === 'failed' ? (
-                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd"></path>
-                </svg>
-              ) : (
-                <span>4</span>
-              )}
-            </div>
-            <span className="text-xs mt-1">Complete</span>
-          </div>
+          {[
+            { phase: 'queue', label: 'Queue' },
+            { phase: 'crawling', label: 'Crawling' },
+            { phase: 'analysis', label: 'Analysis' },
+            { phase: 'complete', label: 'Complete' }
+          ].map(({ phase, label }) => {
+            const stepStatus = getStepStatus(phase as Phase);
+            return (
+              <div key={phase} className="flex flex-col items-center">
+                <div className={`w-6 h-6 flex items-center justify-center rounded-full ${
+                  stepStatus === 'complete' ? 'bg-indigo-600 text-white' :
+                  stepStatus === 'current' ? 'bg-indigo-200 text-indigo-600 border-2 border-indigo-600' :
+                  'bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400'
+                }`}>
+                  {stepStatus === 'complete' ? (
+                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"></path>
+                    </svg>
+                  ) : (
+                    <span>{getPhaseStartPercentage(phase as Phase) / 25 + 1}</span>
+                  )}
+                </div>
+                <span className="text-xs mt-1">{label}</span>
+              </div>
+            );
+          })}
         </div>
 
         {/* Advanced logs toggle */}

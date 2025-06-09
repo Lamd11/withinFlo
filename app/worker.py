@@ -29,10 +29,13 @@ def process_url(job_id: str, url: str, auth: dict = None, website_context: dict 
         # Initialize progress tracking
         progress = JobProgress()
         
-        def update_progress(log_message: str = None):
+        def update_progress(log_message: str = None, phase_progress: float = None):
             if log_message:
                 progress.logs.append(f"[{datetime.utcnow().isoformat()}] {log_message}")
             
+            if phase_progress is not None:
+                progress.phase_progress = phase_progress
+                
             jobs_collection.update_one(
                 {'_id': job_id},
                 {'$set': {
@@ -42,9 +45,9 @@ def process_url(job_id: str, url: str, auth: dict = None, website_context: dict 
                 }}
             )
 
-        # Update initial status
-        progress.current_phase = JobStatus.CRAWLING
-        update_progress("Starting website crawl...")
+        # Update initial status with 0% progress
+        progress.current_phase = JobStatus.PENDING
+        update_progress("Initializing analysis...", 0)
 
         # Create instances of required components
         analyzer = TestCaseAnalyzer()
@@ -60,15 +63,24 @@ def process_url(job_id: str, url: str, auth: dict = None, website_context: dict 
         try:
             # Run async operations
             async def process_website(website_context):
+                # Update to crawling phase with 0% progress
+                progress.current_phase = JobStatus.CRAWLING
+                update_progress("Starting website crawl...", 0)
+                
                 # Crawl the website
                 async with WebsiteCrawler() as crawler:
+                    # Update progress to show we're setting up the crawler
+                    update_progress("Setting up crawler...", 20)
+                    
+                    # Start the crawl
+                    update_progress("Crawling website...", 40)
                     crawl_result = await crawler.crawl(url, auth)
                     elements = crawl_result['elements']
                     page_title = crawl_result['page_title']
 
-                    # Update progress with total elements
+                    # Update progress to show we've found elements
+                    update_progress(f"Found {len(elements)} elements to analyze", 100)
                     progress.total_elements = len(elements)
-                    update_progress(f"Found {len(elements)} elements to analyze")
 
                 # Update website context with page title if available
                 if website_context is None:
@@ -79,13 +91,13 @@ def process_url(job_id: str, url: str, auth: dict = None, website_context: dict 
 
                 # Switch to analyzing phase
                 progress.current_phase = JobStatus.ANALYZING
-                update_progress("Starting element analysis...")
+                update_progress("Starting element analysis...", 0)
 
                 # Define progress callback
                 async def progress_callback(completed: int, total: int):
                     progress.processed_elements = completed
-                    progress.phase_progress = int((completed / total) * 100)
-                    update_progress(f"Analyzed {completed}/{total} elements")
+                    phase_progress = int((completed / total) * 100)
+                    update_progress(f"Analyzed {completed}/{total} elements", phase_progress)
 
                 # Process elements concurrently using analyzer's semaphore
                 test_cases = await analyzer.analyze_elements(elements, website_context, progress_callback)
@@ -93,8 +105,7 @@ def process_url(job_id: str, url: str, auth: dict = None, website_context: dict 
                 # Update progress
                 progress.processed_elements = len(elements)
                 progress.generated_test_cases = len(test_cases)
-                progress.phase_progress = 100
-                update_progress(f"Completed analysis of {len(elements)} elements")
+                update_progress(f"Completed analysis of {len(elements)} elements", 100)
 
                 return elements, test_cases, page_title
 
@@ -103,7 +114,7 @@ def process_url(job_id: str, url: str, auth: dict = None, website_context: dict 
 
             # Switch to generating phase
             progress.current_phase = JobStatus.GENERATING
-            update_progress("Generating documentation...")
+            update_progress("Generating documentation...", 0)
 
             # Create analysis result
             result = AnalysisResult(
@@ -115,8 +126,10 @@ def process_url(job_id: str, url: str, auth: dict = None, website_context: dict 
                 website_context=website_context
             )
 
-            # Generate documentation
+            # Generate documentation with progress updates
+            update_progress("Formatting documentation...", 50)
             documentation = generator.generate_documentation(result)
+            update_progress("Documentation generated successfully", 100)
 
             # Update job with results and complete
             progress.current_phase = JobStatus.COMPLETED
