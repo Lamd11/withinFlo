@@ -26,13 +26,19 @@ class JobStatus(str, Enum):
     COMPLETED = "completed"
     FAILED = "failed"
 
+class Position(BaseModel):
+    x: float
+    y: float
+    width: float
+    height: float
+
 class UIElement(BaseModel):
     element_id: str
     element_type: str
     selector: str
     attributes: Dict[str, str]
     visible_text: Optional[str] = None
-    position: Optional[Dict[str, int]] = None
+    position: Optional[Position] = None
 
 class TestStep(BaseModel):
     step_number: int

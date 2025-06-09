@@ -43,43 +43,48 @@ def process_url(job_id: str, url: str, auth: dict = None, website_context: dict 
         analyzer = TestCaseAnalyzer()
         generator = DocumentationGenerator()
 
-        # Run async crawl
-        async def crawl_website():
-            async with WebsiteCrawler() as crawler:
-                page_details = await crawler.crawl(url, auth)
-                return page_details
+        try:
+            # Run async operations
+            async def process_website(website_context):
+                # Crawl the website
+                async with WebsiteCrawler() as crawler:
+                    crawl_result = await crawler.crawl(url, auth)
+                    elements = crawl_result['elements']
+                    page_title = crawl_result['page_title']
 
-        # Crawl the website
-        crawl_result = loop.run_until_complete(crawl_website())
-        elements = crawl_result['elements']
-        page_title = crawl_result['page_title']
-        loop.close()
+                # Update website context with page title if available
+                if website_context is None:
+                    website_context = {}
+                
+                if page_title and 'current_page_description' not in website_context:
+                    website_context['current_page_description'] = page_title
+                    
+                logger.info(f"Processing {len(elements)} elements with context: {website_context}")
 
-        # Update website context with page title if available
-        if website_context is None:
-            website_context = {}
-        
-        if page_title and 'current_page_description' not in website_context:
-            website_context['current_page_description'] = page_title
-            
-        logger.info(f"Processing {len(elements)} elements with context: {website_context}")
+                # Analyze elements and generate test cases concurrently
+                test_cases = await analyzer.analyze_elements(elements, website_context)
+                logger.info(f"Generated {len(test_cases)} test cases")
 
-        # Analyze elements and generate test cases
-        test_cases = analyzer.analyze_elements(elements, website_context)
-        logger.info(f"Generated {len(test_cases)} test cases")
+                return elements, test_cases, page_title
 
-        # Create analysis result
-        result = AnalysisResult(
-            source_url=url,
-            analysis_timestamp=datetime.utcnow(),
-            page_title=page_title,
-            identified_elements=elements,
-            generated_test_cases=test_cases,
-            website_context=website_context
-        )
+            # Run everything in the event loop
+            elements, test_cases, page_title = loop.run_until_complete(process_website(website_context))
 
-        # Generate documentation
-        documentation = generator.generate_documentation(result)
+            # Create analysis result
+            result = AnalysisResult(
+                source_url=url,
+                analysis_timestamp=datetime.utcnow(),
+                page_title=page_title,
+                identified_elements=elements,
+                generated_test_cases=test_cases,
+                website_context=website_context
+            )
+
+            # Generate documentation
+            documentation = generator.generate_documentation(result)
+
+        finally:
+            loop.close()
 
         # Update job with results
         jobs_collection.update_one(
