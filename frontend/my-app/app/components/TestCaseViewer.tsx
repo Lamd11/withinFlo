@@ -192,7 +192,7 @@ export default function TestCaseViewer({ markdown }: TestCaseViewerProps) {
       case 'priority':
         const priorityOrder = { 'high': 0, 'medium': 1, 'low': 2 };
         return direction * (
-          priorityOrder[a.priority.toLowerCase()] - priorityOrder[b.priority.toLowerCase()]
+          priorityOrder[a.priority.toLowerCase() as keyof typeof priorityOrder] - priorityOrder[b.priority.toLowerCase() as keyof typeof priorityOrder]
         );
       case 'title':
         return direction * a.title.localeCompare(b.title);
