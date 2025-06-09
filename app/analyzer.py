@@ -168,20 +168,36 @@ If the element is very generic (e.g. a 'div' with no clear text), try to infer i
             logger.error(f"Error analyzing element {element.element_id} ({element.selector}): {str(e)}", exc_info=True)
             raise
 
-    async def analyze_elements(self, elements: List[UIElement], website_context: Dict[str, Any] = None) -> List[TestCase]:
+    async def analyze_elements(self, elements: List[UIElement], website_context: Dict[str, Any] = None, progress_callback=None) -> List[TestCase]:
+        # Get the current event loop
+        loop = asyncio.get_event_loop()
+        
+        # Create tasks in the current loop
         tasks = []
         for element in elements:
             tasks.append(self.analyze_element(element, website_context))
         
         # Process all elements concurrently and gather results
         test_cases = []
+        completed_count = 0
+        total_count = len(tasks)
+        
         for task in asyncio.as_completed(tasks):
             try:
                 test_case = await task
                 test_cases.append(test_case)
-                logger.info(f"Completed processing test case: {test_case.test_case_id}")
+                completed_count += 1
+                
+                # Call progress callback if provided
+                if progress_callback:
+                    await progress_callback(completed_count, total_count)
+                    
+                logger.info(f"Completed processing test case: {test_case.test_case_id} ({completed_count}/{total_count})")
             except Exception as e:
                 logger.warning(f"Failed to generate test case due to: {str(e)}. Skipping this element.")
+                completed_count += 1
+                if progress_callback:
+                    await progress_callback(completed_count, total_count)
                 continue
         
         return test_cases

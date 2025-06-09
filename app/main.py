@@ -73,7 +73,8 @@ async def get_job_status(job_id: str):
             created_at=job['created_at'],
             updated_at=job['updated_at'],
             result=job.get('result'),
-            error=job.get('error')
+            error=job.get('error'),
+            progress=job.get('progress')
         )
         
     except HTTPException:

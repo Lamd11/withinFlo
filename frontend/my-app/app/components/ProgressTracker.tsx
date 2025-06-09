@@ -1,22 +1,37 @@
 'use client';
 
 import React, { useState } from 'react';
+import { ChartBarIcon, CheckCircleIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 
-interface ProgressTrackerProps {
-  status: 'pending' | 'processing' | 'completed' | 'failed';
+interface JobProgress {
+  total_elements: number;
+  processed_elements: number;
+  total_test_cases: number;
+  generated_test_cases: number;
+  current_phase: string;
+  phase_progress: number;
   logs: string[];
-  progress: number;
 }
 
-export default function ProgressTracker({ status, logs, progress }: ProgressTrackerProps) {
+interface ProgressTrackerProps {
+  status: 'pending' | 'crawling' | 'analyzing' | 'generating' | 'completed' | 'failed';
+  progress: JobProgress;
+  logs: string[];
+}
+
+export default function ProgressTracker({ status, progress, logs }: ProgressTrackerProps) {
   const [showAdvanced, setShowAdvanced] = useState(false);
 
   const getStatusText = () => {
     switch (status) {
       case 'pending':
         return 'Waiting to start analysis...';
-      case 'processing':
-        return 'Analyzing website...';
+      case 'crawling':
+        return 'Crawling website...';
+      case 'analyzing':
+        return `Analyzing elements (${progress.processed_elements}/${progress.total_elements})...`;
+      case 'generating':
+        return 'Generating documentation...';
       case 'completed':
         return 'Analysis completed successfully!';
       case 'failed':
@@ -30,7 +45,9 @@ export default function ProgressTracker({ status, logs, progress }: ProgressTrac
     switch (status) {
       case 'pending':
         return 'text-yellow-600 dark:text-yellow-400';
-      case 'processing':
+      case 'crawling':
+      case 'analyzing':
+      case 'generating':
         return 'text-blue-600 dark:text-blue-400';
       case 'completed':
         return 'text-green-600 dark:text-green-400';
@@ -38,6 +55,21 @@ export default function ProgressTracker({ status, logs, progress }: ProgressTrac
         return 'text-red-600 dark:text-red-400';
       default:
         return 'text-gray-600 dark:text-gray-400';
+    }
+  };
+
+  const getProgressPercentage = () => {
+    switch (status) {
+      case 'crawling':
+        return progress.phase_progress * 0.3;
+      case 'analyzing':
+        return 30 + (progress.phase_progress * 0.5);
+      case 'generating':
+        return 80 + (progress.phase_progress * 0.2);
+      case 'completed':
+        return 100;
+      default:
+        return 0;
     }
   };
 
@@ -51,11 +83,27 @@ export default function ProgressTracker({ status, logs, progress }: ProgressTrac
           </span>
         </div>
 
+        {/* Progress Statistics */}
+        <div className="grid grid-cols-2 gap-4 mb-4">
+          <div className="bg-gray-50 dark:bg-gray-700 p-3 rounded-lg">
+            <div className="text-sm text-gray-500 dark:text-gray-400">Elements</div>
+            <div className="text-lg font-semibold text-gray-900 dark:text-white">
+              {progress.processed_elements} / {progress.total_elements || '?'}
+            </div>
+          </div>
+          <div className="bg-gray-50 dark:bg-gray-700 p-3 rounded-lg">
+            <div className="text-sm text-gray-500 dark:text-gray-400">Test Cases</div>
+            <div className="text-lg font-semibold text-gray-900 dark:text-white">
+              {progress.generated_test_cases}
+            </div>
+          </div>
+        </div>
+
         {/* Progress bar */}
         <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5 mb-4">
           <div 
             className="bg-indigo-600 h-2.5 rounded-full transition-all duration-300 ease-in-out"
-            style={{ width: `${progress}%` }}
+            style={{ width: `${getProgressPercentage()}%` }}
           ></div>
         </div>
 
@@ -77,9 +125,9 @@ export default function ProgressTracker({ status, logs, progress }: ProgressTrac
           </div>
           <div className="flex flex-col items-center">
             <div className={`w-6 h-6 flex items-center justify-center rounded-full ${
-              status === 'processing' || status === 'completed' || status === 'failed' ? 'bg-indigo-600 text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400'
+              status === 'crawling' || status === 'analyzing' || status === 'generating' || status === 'completed' || status === 'failed' ? 'bg-indigo-600 text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400'
             }`}>
-              {status === 'completed' || status === 'failed' ? (
+              {status === 'analyzing' || status === 'generating' || status === 'completed' || status === 'failed' ? (
                 <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"></path>
                 </svg>
@@ -91,15 +139,11 @@ export default function ProgressTracker({ status, logs, progress }: ProgressTrac
           </div>
           <div className="flex flex-col items-center">
             <div className={`w-6 h-6 flex items-center justify-center rounded-full ${
-              status === 'completed' || status === 'failed' ? 'bg-indigo-600 text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400'
+              status === 'analyzing' || status === 'generating' || status === 'completed' || status === 'failed' ? 'bg-indigo-600 text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400'
             }`}>
-              {status === 'completed' ? (
+              {status === 'generating' || status === 'completed' || status === 'failed' ? (
                 <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"></path>
-                </svg>
-              ) : status === 'failed' ? (
-                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd"></path>
                 </svg>
               ) : (
                 <span>3</span>
@@ -149,8 +193,8 @@ export default function ProgressTracker({ status, logs, progress }: ProgressTrac
         {/* Advanced logs */}
         {showAdvanced && (
           <div className="mt-4 bg-gray-100 dark:bg-gray-900 rounded-md p-3 max-h-60 overflow-y-auto font-mono text-xs">
-            {logs.length > 0 ? (
-              logs.map((log, index) => (
+            {progress.logs.length > 0 ? (
+              progress.logs.map((log, index) => (
                 <div key={index} className="py-1 border-b border-gray-200 dark:border-gray-800 last:border-0">
                   {log}
                 </div>

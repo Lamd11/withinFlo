@@ -20,9 +20,20 @@ class JobRequest(BaseModel):
     auth: Optional[AuthConfig] = None
     website_context: Optional[Dict[str, Any]] = None  # Added for custom context information
 
+class JobProgress(BaseModel):
+    total_elements: int = 0
+    processed_elements: int = 0
+    total_test_cases: int = 0
+    generated_test_cases: int = 0
+    current_phase: str = "pending"
+    phase_progress: float = 0.0
+    logs: List[str] = []
+
 class JobStatus(str, Enum):
     PENDING = "pending"
-    PROCESSING = "processing"
+    CRAWLING = "crawling"
+    ANALYZING = "analyzing"
+    GENERATING = "generating"
     COMPLETED = "completed"
     FAILED = "failed"
 
@@ -70,4 +81,5 @@ class JobResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     result: Optional[AnalysisResult] = None
-    error: Optional[str] = None 
+    error: Optional[str] = None
+    progress: Optional[JobProgress] = None  # Add progress field 

@@ -2,7 +2,7 @@ from celery import Celery
 from .crawler import WebsiteCrawler
 from .analyzer import TestCaseAnalyzer
 from .generator import DocumentationGenerator
-from .models import AnalysisResult, JobStatus
+from .models import AnalysisResult, JobStatus, JobProgress
 from datetime import datetime
 import os
 import logging
@@ -26,22 +26,36 @@ jobs_collection = db['jobs']
 @celery_app.task
 def process_url(job_id: str, url: str, auth: dict = None, website_context: dict = None):
     try:
-        # Update job status to processing
-        jobs_collection.update_one(
-            {'_id': job_id},
-            {'$set': {
-                'status': JobStatus.PROCESSING,
-                'updated_at': datetime.utcnow()
-            }}
-        )
+        # Initialize progress tracking
+        progress = JobProgress()
+        
+        def update_progress(log_message: str = None):
+            if log_message:
+                progress.logs.append(f"[{datetime.utcnow().isoformat()}] {log_message}")
+            
+            jobs_collection.update_one(
+                {'_id': job_id},
+                {'$set': {
+                    'status': progress.current_phase,
+                    'progress': progress.dict(),
+                    'updated_at': datetime.utcnow()
+                }}
+            )
 
-        # Create event loop for async operations
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
+        # Update initial status
+        progress.current_phase = JobStatus.CRAWLING
+        update_progress("Starting website crawl...")
 
-        # Initialize components
+        # Create instances of required components
         analyzer = TestCaseAnalyzer()
         generator = DocumentationGenerator()
+
+        # Create and set event loop
+        try:
+            loop = asyncio.get_event_loop()
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
 
         try:
             # Run async operations
@@ -52,23 +66,44 @@ def process_url(job_id: str, url: str, auth: dict = None, website_context: dict 
                     elements = crawl_result['elements']
                     page_title = crawl_result['page_title']
 
+                    # Update progress with total elements
+                    progress.total_elements = len(elements)
+                    update_progress(f"Found {len(elements)} elements to analyze")
+
                 # Update website context with page title if available
                 if website_context is None:
                     website_context = {}
                 
                 if page_title and 'current_page_description' not in website_context:
                     website_context['current_page_description'] = page_title
-                    
-                logger.info(f"Processing {len(elements)} elements with context: {website_context}")
 
-                # Analyze elements and generate test cases concurrently
-                test_cases = await analyzer.analyze_elements(elements, website_context)
-                logger.info(f"Generated {len(test_cases)} test cases")
+                # Switch to analyzing phase
+                progress.current_phase = JobStatus.ANALYZING
+                update_progress("Starting element analysis...")
+
+                # Define progress callback
+                async def progress_callback(completed: int, total: int):
+                    progress.processed_elements = completed
+                    progress.phase_progress = int((completed / total) * 100)
+                    update_progress(f"Analyzed {completed}/{total} elements")
+
+                # Process elements concurrently using analyzer's semaphore
+                test_cases = await analyzer.analyze_elements(elements, website_context, progress_callback)
+                
+                # Update progress
+                progress.processed_elements = len(elements)
+                progress.generated_test_cases = len(test_cases)
+                progress.phase_progress = 100
+                update_progress(f"Completed analysis of {len(elements)} elements")
 
                 return elements, test_cases, page_title
 
             # Run everything in the event loop
             elements, test_cases, page_title = loop.run_until_complete(process_website(website_context))
+
+            # Switch to generating phase
+            progress.current_phase = JobStatus.GENERATING
+            update_progress("Generating documentation...")
 
             # Create analysis result
             result = AnalysisResult(
@@ -83,29 +118,40 @@ def process_url(job_id: str, url: str, auth: dict = None, website_context: dict 
             # Generate documentation
             documentation = generator.generate_documentation(result)
 
+            # Update job with results and complete
+            progress.current_phase = JobStatus.COMPLETED
+            jobs_collection.update_one(
+                {'_id': job_id},
+                {'$set': {
+                    'status': JobStatus.COMPLETED,
+                    'progress': progress.dict(),
+                    'updated_at': datetime.utcnow(),
+                    'result': result.dict(),
+                    'documentation': documentation
+                }}
+            )
+
+            return job_id
+
         finally:
-            loop.close()
-
-        # Update job with results
-        jobs_collection.update_one(
-            {'_id': job_id},
-            {'$set': {
-                'status': JobStatus.COMPLETED,
-                'updated_at': datetime.utcnow(),
-                'result': result.dict(),
-                'documentation': documentation
-            }}
-        )
-
-        return job_id
+            # Clean up the event loop
+            try:
+                if loop.is_running():
+                    loop.stop()
+                if not loop.is_closed():
+                    loop.close()
+            except Exception as e:
+                logger.warning(f"Error cleaning up event loop: {str(e)}")
 
     except Exception as e:
         logger.error(f"Error processing job {job_id}: {str(e)}")
         # Update job with error
+        progress.current_phase = JobStatus.FAILED
         jobs_collection.update_one(
             {'_id': job_id},
             {'$set': {
                 'status': JobStatus.FAILED,
+                'progress': progress.dict(),
                 'updated_at': datetime.utcnow(),
                 'error': str(e)
             }}

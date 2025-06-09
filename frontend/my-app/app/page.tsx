@@ -6,12 +6,29 @@ import UrlForm from './components/UrlForm';
 import ProgressTracker from './components/ProgressTracker';
 import ResultsViewer from './components/ResultsViewer';
 
+interface JobProgress {
+  total_elements: number;
+  processed_elements: number;
+  total_test_cases: number;
+  generated_test_cases: number;
+  current_phase: string;
+  phase_progress: number;
+  logs: string[];
+}
+
 export default function Home() {
   const [jobId, setJobId] = useState<string | null>(null);
-  const [status, setStatus] = useState<'pending' | 'processing' | 'completed' | 'failed'>('pending');
+  const [status, setStatus] = useState<'pending' | 'crawling' | 'analyzing' | 'generating' | 'completed' | 'failed'>('pending');
   const [isLoading, setIsLoading] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const [logs, setLogs] = useState<string[]>([]);
+  const [progress, setProgress] = useState<JobProgress>({
+    total_elements: 0,
+    processed_elements: 0,
+    total_test_cases: 0,
+    generated_test_cases: 0,
+    current_phase: 'pending',
+    phase_progress: 0,
+    logs: []
+  });
   const [results, setResults] = useState<{ markdown: string; json: any } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -25,86 +42,60 @@ export default function Home() {
         const data = await response.json();
         
         setStatus(data.status);
+        if (data.progress) {
+          setProgress(data.progress);
+        }
         
-        // Update progress based on status
-        if (data.status === 'pending') {
-          setProgress(10);
-          addLog('Job queued, waiting to start...');
-        } else if (data.status === 'processing') {
-          setProgress(50);
-          addLog('Processing website...');
-        } else if (data.status === 'completed') {
-          setProgress(100);
-          addLog('Analysis completed successfully!');
+        if (data.status === 'completed') {
           fetchResults();
         } else if (data.status === 'failed') {
-          setProgress(100);
           setError(data.error || 'Analysis failed');
-          addLog(`Error: ${data.error || 'Unknown error'}`);
         }
       } catch (error) {
         console.error('Error polling job status:', error);
-        addLog(`Error checking job status: ${error instanceof Error ? error.message : String(error)}`);
+        const errorMessage = `Error checking job status: ${error instanceof Error ? error.message : String(error)}`;
+        setProgress(prev => ({
+          ...prev,
+          logs: [...prev.logs, errorMessage]
+        }));
       }
     }, 2000);
 
     return () => clearInterval(interval);
   }, [jobId, status]);
 
-  const addLog = (message: string) => {
-    setLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] ${message}`]);
-  };
-
-  const handleSubmit = async (url: string, auth: any, context: any) => {
+  const handleSubmit = async (url: string, auth: any = null, context: any = null) => {
     setIsLoading(true);
-    setJobId(null);
-    setStatus('pending');
-    setProgress(0);
-    setLogs([]);
-    setResults(null);
     setError(null);
-    
+    setProgress({
+      total_elements: 0,
+      processed_elements: 0,
+      total_test_cases: 0,
+      generated_test_cases: 0,
+      current_phase: 'pending',
+      phase_progress: 0,
+      logs: []
+    });
+    setStatus('pending');
+
     try {
-      addLog(`Starting analysis of ${url}`);
-      
-      // Log request details for debugging
-      console.log('Sending request to:', 'http://localhost:8000/jobs');
-      console.log('Request body:', JSON.stringify({
-        url,
-        auth,
-        website_context: context
-      }));
-      
       const response = await fetch('http://localhost:8000/jobs', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          url,
-          auth,
-          website_context: context
-        }),
+        body: JSON.stringify({ url, auth, website_context: context }),
       });
-      
-      // Log response status for debugging
-      console.log('Response status:', response.status);
-      
+
       if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Error response:', errorText);
-        throw new Error(`Server responded with ${response.status}: ${errorText || response.statusText}`);
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
-      
+
       const data = await response.json();
-      console.log('Response data:', data);
       setJobId(data.job_id);
-      addLog(`Job created with ID: ${data.job_id}`);
     } catch (error) {
-      console.error('Error submitting job:', error);
-      setStatus('failed');
-      setError(error instanceof Error ? error.message : 'Failed to submit job');
-      addLog(`Error: ${error instanceof Error ? error.message : String(error)}`);
+      console.error('Error submitting URL:', error);
+      setError(error instanceof Error ? error.message : String(error));
     } finally {
       setIsLoading(false);
     }
@@ -112,29 +103,19 @@ export default function Home() {
 
   const fetchResults = async () => {
     if (!jobId) return;
-    
+
     try {
       const response = await fetch(`http://localhost:8000/jobs/${jobId}/results`);
-      
-      if (!response.ok) {
-        throw new Error(`Server responded with ${response.status}: ${response.statusText}`);
-      }
-      
       const data = await response.json();
-      setResults({
-        markdown: data.markdown || '# No test cases generated',
-        json: data.json || {}
-      });
-      addLog('Results fetched successfully');
+      setResults(data);
     } catch (error) {
       console.error('Error fetching results:', error);
-      setError(error instanceof Error ? error.message : 'Failed to fetch results');
-      addLog(`Error fetching results: ${error instanceof Error ? error.message : String(error)}`);
+      setError(error instanceof Error ? error.message : String(error));
     }
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+    <div className="min-h-screen bg-gray-100 dark:bg-gray-900">
       <Header />
       
       <main className="container mx-auto px-4 py-8">
@@ -143,8 +124,8 @@ export default function Home() {
         {jobId && (
           <ProgressTracker 
             status={status} 
-            logs={logs} 
-            progress={progress} 
+            progress={progress}
+            logs={[]} // We're now using progress.logs instead
           />
         )}
         
@@ -153,7 +134,7 @@ export default function Home() {
             markdown={results.markdown} 
             json={results.json} 
             jobId={jobId}
-            />
+          />
         )}
         
         {error && (
