@@ -147,19 +147,14 @@ export default function ProgressTracker({ status, progress, logs }: ProgressTrac
           </span>
         </div>
 
-        {/* Progress Statistics */}
-        <div className="grid grid-cols-2 gap-4 mb-4">
-          <div className="bg-gray-50 dark:bg-gray-700 p-3 rounded-lg">
-            <div className="text-sm text-gray-500 dark:text-gray-400">Elements</div>
-            <div className="text-lg font-semibold text-gray-900 dark:text-white">
-              {progress.processed_elements} / {progress.total_elements || '?'}
-            </div>
-          </div>
-          <div className="bg-gray-50 dark:bg-gray-700 p-3 rounded-lg">
-            <div className="text-sm text-gray-500 dark:text-gray-400">Test Cases</div>
-            <div className="text-lg font-semibold text-gray-900 dark:text-white">
-              {progress.generated_test_cases}
-            </div>
+        {/* Statistics */}
+        <div className="flex items-start mb-4">
+          <div className="text-sm">
+            <p className="text-gray-600 dark:text-gray-400">Elements Processed</p>
+            <p className="text-2xl font-semibold">
+              {progress.processed_elements}
+              {progress.total_elements > 0 && `/${progress.total_elements}`}
+            </p>
           </div>
         </div>
 
