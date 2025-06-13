@@ -54,7 +54,7 @@ export default function ProgressTracker({ status, logs, progress }: ProgressTrac
         {/* Progress bar */}
         <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5 mb-4">
           <div 
-            className="bg-indigo-600 h-2.5 rounded-full transition-all duration-300 ease-in-out"
+            className="bg-[#38686a] h-2.5 rounded-full transition-all duration-300 ease-in-out"
             style={{ width: `${progress}%` }}
           ></div>
         </div>
@@ -63,7 +63,7 @@ export default function ProgressTracker({ status, logs, progress }: ProgressTrac
         <div className="flex justify-between mb-6">
           <div className="flex flex-col items-center">
             <div className={`w-6 h-6 flex items-center justify-center rounded-full ${
-              status !== 'pending' ? 'bg-indigo-600 text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400'
+              status !== 'pending' ? 'bg-[#38686a] text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400'
             }`}>
               {status !== 'pending' ? (
                 <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
@@ -77,7 +77,7 @@ export default function ProgressTracker({ status, logs, progress }: ProgressTrac
           </div>
           <div className="flex flex-col items-center">
             <div className={`w-6 h-6 flex items-center justify-center rounded-full ${
-              status === 'processing' || status === 'completed' || status === 'failed' ? 'bg-indigo-600 text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400'
+              status === 'processing' || status === 'completed' || status === 'failed' ? 'bg-[#38686a] text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400'
             }`}>
               {status === 'completed' || status === 'failed' ? (
                 <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
@@ -91,7 +91,7 @@ export default function ProgressTracker({ status, logs, progress }: ProgressTrac
           </div>
           <div className="flex flex-col items-center">
             <div className={`w-6 h-6 flex items-center justify-center rounded-full ${
-              status === 'completed' || status === 'failed' ? 'bg-indigo-600 text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400'
+              status === 'completed' || status === 'failed' ? 'bg-[#38686a] text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400'
             }`}>
               {status === 'completed' ? (
                 <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
@@ -109,7 +109,7 @@ export default function ProgressTracker({ status, logs, progress }: ProgressTrac
           </div>
           <div className="flex flex-col items-center">
             <div className={`w-6 h-6 flex items-center justify-center rounded-full ${
-              status === 'completed' ? 'bg-green-600 text-white' : status === 'failed' ? 'bg-red-600 text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400'
+              status === 'completed' ? 'bg-[#38686a] text-white' : status === 'failed' ? 'bg-[#38686a] text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400'
             }`}>
               {status === 'completed' ? (
                 <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
@@ -132,7 +132,7 @@ export default function ProgressTracker({ status, logs, progress }: ProgressTrac
           <button
             type="button"
             onClick={() => setShowAdvanced(!showAdvanced)}
-            className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 text-sm flex items-center"
+            className="text-[#38686a] hover:text-[#2a4e50] text-sm flex items-center"
           >
             {showAdvanced ? 'Hide' : 'Show'} Advanced Logs
             <svg

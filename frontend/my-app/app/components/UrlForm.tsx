@@ -90,7 +90,7 @@ export default function UrlForm({ onSubmit, isLoading }: UrlFormProps) {
               placeholder="https://example.com"
               className={`block w-full px-4 py-3 rounded-md border ${
                 urlError ? 'border-red-300 text-red-900' : 'border-gray-300 dark:border-gray-600'
-              } focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:text-white`}
+              } focus:outline-none focus:ring-[#38686a] focus:border-[#38686a] dark:bg-gray-700 dark:text-white`}
               disabled={isLoading}
             />
             {urlError && (
@@ -103,7 +103,7 @@ export default function UrlForm({ onSubmit, isLoading }: UrlFormProps) {
           <button
             type="button"
             onClick={() => setShowAdvanced(!showAdvanced)}
-            className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 text-sm flex items-center"
+            className="text-[#38686a] hover:text-[#2a4e50] text-sm flex items-center"
           >
             {showAdvanced ? 'Hide' : 'Show'} Advanced Options
             <svg
@@ -127,7 +127,7 @@ export default function UrlForm({ onSubmit, isLoading }: UrlFormProps) {
                   type="checkbox"
                   checked={useAuth}
                   onChange={() => setUseAuth(!useAuth)}
-                  className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                  className="h-4 w-4 text-[#38686a] focus:ring-[#38686a] border-gray-300 rounded"
                 />
                 <label htmlFor="use-auth" className="ml-2 block text-sm text-gray-700 dark:text-gray-300">
                   Website requires authentication
@@ -145,7 +145,7 @@ export default function UrlForm({ onSubmit, isLoading }: UrlFormProps) {
                         value="basic"
                         checked={authType === 'basic'}
                         onChange={() => setAuthType('basic')}
-                        className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300"
+                        className="h-4 w-4 text-[#38686a] focus:ring-[#38686a] border-gray-300"
                       />
                       <label htmlFor="auth-basic" className="ml-2 block text-sm text-gray-700 dark:text-gray-300">
                         Basic Auth
@@ -159,7 +159,7 @@ export default function UrlForm({ onSubmit, isLoading }: UrlFormProps) {
                         value="session"
                         checked={authType === 'session'}
                         onChange={() => setAuthType('session')}
-                        className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300"
+                        className="h-4 w-4 text-[#38686a] focus:ring-[#38686a] border-gray-300"
                       />
                       <label htmlFor="auth-session" className="ml-2 block text-sm text-gray-700 dark:text-gray-300">
                         Session Token
@@ -178,7 +178,7 @@ export default function UrlForm({ onSubmit, isLoading }: UrlFormProps) {
                           id="username"
                           value={username}
                           onChange={(e) => setUsername(e.target.value)}
-                          className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:text-white"
+                          className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-[#38686a] focus:border-[#38686a] dark:bg-gray-700 dark:text-white"
                         />
                       </div>
                       <div>
@@ -190,7 +190,7 @@ export default function UrlForm({ onSubmit, isLoading }: UrlFormProps) {
                           id="password"
                           value={password}
                           onChange={(e) => setPassword(e.target.value)}
-                          className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:text-white"
+                          className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-[#38686a] focus:border-[#38686a] dark:bg-gray-700 dark:text-white"
                         />
                       </div>
                     </div>
@@ -205,7 +205,7 @@ export default function UrlForm({ onSubmit, isLoading }: UrlFormProps) {
                           id="token"
                           value={token}
                           onChange={(e) => setToken(e.target.value)}
-                          className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:text-white"
+                          className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-[#38686a] focus:border-[#38686a] dark:bg-gray-700 dark:text-white"
                         />
                       </div>
                       <div>
@@ -221,7 +221,7 @@ export default function UrlForm({ onSubmit, isLoading }: UrlFormProps) {
                               value="cookie"
                               checked={tokenType === 'cookie'}
                               onChange={() => setTokenType('cookie')}
-                              className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300"
+                              className="h-4 w-4 text-[#38686a] focus:ring-[#38686a] border-gray-300"
                             />
                             <label htmlFor="token-cookie" className="ml-2 block text-sm text-gray-700 dark:text-gray-300">
                               Cookie
@@ -235,7 +235,7 @@ export default function UrlForm({ onSubmit, isLoading }: UrlFormProps) {
                               value="bearer"
                               checked={tokenType === 'bearer'}
                               onChange={() => setTokenType('bearer')}
-                              className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300"
+                              className="h-4 w-4 text-[#38686a] focus:ring-[#38686a] border-gray-300"
                             />
                             <label htmlFor="token-bearer" className="ml-2 block text-sm text-gray-700 dark:text-gray-300">
                               Bearer
@@ -257,7 +257,7 @@ export default function UrlForm({ onSubmit, isLoading }: UrlFormProps) {
                   type="checkbox"
                   checked={useContext}
                   onChange={() => setUseContext(!useContext)}
-                  className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                  className="h-4 w-4 text-[#38686a] focus:ring-[#38686a] border-gray-300 rounded"
                 />
                 <label htmlFor="use-context" className="ml-2 block text-sm text-gray-700 dark:text-gray-300">
                   Provide additional context about the website
@@ -276,7 +276,7 @@ export default function UrlForm({ onSubmit, isLoading }: UrlFormProps) {
                       placeholder="E-commerce, Blog, SaaS Dashboard, etc."
                       value={siteType}
                       onChange={(e) => setSiteType(e.target.value)}
-                      className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:text-white"
+                      className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-[#38686a] focus:border-[#38686a] dark:bg-gray-700 dark:text-white"
                     />
                   </div>
                   <div>
@@ -289,7 +289,7 @@ export default function UrlForm({ onSubmit, isLoading }: UrlFormProps) {
                       placeholder="Product Detail Page, User Dashboard, etc."
                       value={pageDescription}
                       onChange={(e) => setPageDescription(e.target.value)}
-                      className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:text-white"
+                      className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-[#38686a] focus:border-[#38686a] dark:bg-gray-700 dark:text-white"
                     />
                   </div>
                   <div>
@@ -302,7 +302,7 @@ export default function UrlForm({ onSubmit, isLoading }: UrlFormProps) {
                       placeholder="Complete purchase, Find information, etc."
                       value={userGoal}
                       onChange={(e) => setUserGoal(e.target.value)}
-                      className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:text-white"
+                      className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-[#38686a] focus:border-[#38686a] dark:bg-gray-700 dark:text-white"
                     />
                   </div>
                 </div>
@@ -315,7 +315,7 @@ export default function UrlForm({ onSubmit, isLoading }: UrlFormProps) {
           <button
             type="submit"
             disabled={isLoading}
-            className={`px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 ${
+            className={`px-6 py-3 bg-[#38686a] hover:bg-[#2a4e50] text-white font-medium rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#38686a] ${
               isLoading ? 'opacity-70 cursor-not-allowed' : ''
             }`}
           >
