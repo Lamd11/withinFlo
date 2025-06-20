@@ -1,5 +1,32 @@
 {
-  "dependencies": {
-    "@react-pdf/renderer": "^4.3.0"
-  }
+  "name": "withinflo",
+  "version": "1.0.0",
+  "description": "Web Analysis & Test Case Generation Platform",
+  "private": true,
+  "workspaces": [
+    "frontend/my-app"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:frontend": "cd frontend/my-app && yarn dev",
+    "dev:backend": "uvicorn main:app --reload --port 8000",
+    "build": "cd frontend/my-app && yarn build",
+    "install:frontend": "cd frontend/my-app && yarn install",
+    "install:backend": "pip install -r requirements.txt",
+    "setup": "npm run install:backend && npm run install:frontend",
+    "start": "cd frontend/my-app && yarn start"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.0"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "python": ">=3.8.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-username/withinflo.git"
+  },
+  "author": "Your Name",
+  "license": "MIT"
 }
