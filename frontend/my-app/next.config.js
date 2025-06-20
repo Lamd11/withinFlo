@@ -1,18 +1,12 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  output: 'standalone',
-  experimental: {
-    serverComponentsExternalPackages: ['@react-pdf/renderer']
-  },
-  env: {
-    CUSTOM_KEY: 'my-value',
-  },
+  serverExternalPackages: ['@react-pdf/renderer'],
   async rewrites() {
     return [
       {
         source: '/api/:path*',
-        destination: process.env.NODE_ENV === 'production' 
-          ? `${process.env.BACKEND_URL}/api/:path*`
+        destination: process.env.NEXT_PUBLIC_API_URL 
+          ? `${process.env.NEXT_PUBLIC_API_URL}/:path*`
           : 'http://localhost:8000/:path*'
       }
     ]

@@ -40,32 +40,40 @@ export default function Home() {
 
     const fetchResults = async () => {
       if (!jobId) return;
-
+      
       try {
-        const response = await fetch(`http://localhost:8000/jobs/${jobId}/results`);
-        const data = await response.json();
-        setResults(data);
+        const response = await fetch(`/api/jobs/${jobId}/results`);
+        if (response.ok) {
+          const data = await response.json();
+          setResults(data);
+        }
       } catch (error) {
         console.error('Error fetching results:', error);
-        setError(error instanceof Error ? error.message : String(error));
+      }
+    };
+
+    const checkJobStatus = async () => {
+      if (!jobId) return;
+      
+      try {
+        const response = await fetch(`/api/jobs/${jobId}/status`);
+        if (response.ok) {
+          const data = await response.json();
+          setStatus(data.status);
+          if (data.status === 'completed') {
+            fetchResults();
+          } else if (data.status === 'failed') {
+            setError(data.error || 'Analysis failed');
+          }
+        }
+      } catch (error) {
+        console.error('Error checking job status:', error);
       }
     };
 
     const interval = setInterval(async () => {
       try {
-        const response = await fetch(`http://localhost:8000/jobs/${jobId}/status`);
-        const data = await response.json();
-        
-        setStatus(data.status);
-        if (data.progress) {
-          setProgress(data.progress);
-        }
-        
-        if (data.status === 'completed') {
-          fetchResults();
-        } else if (data.status === 'failed') {
-          setError(data.error || 'Analysis failed');
-        }
+        await checkJobStatus();
       } catch (error) {
         console.error('Error polling job status:', error);
         const errorMessage = `Error checking job status: ${error instanceof Error ? error.message : String(error)}`;
@@ -94,7 +102,7 @@ export default function Home() {
     setStatus('pending');
 
     try {
-      const response = await fetch('http://localhost:8000/jobs', {
+      const response = await fetch('/api/jobs', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

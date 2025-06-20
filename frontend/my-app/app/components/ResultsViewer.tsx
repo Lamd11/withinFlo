@@ -2,8 +2,6 @@
 
 import React, { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
-import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import TestCaseViewer from './TestCaseViewer';
 
 interface ResultsViewerProps {
@@ -146,13 +144,11 @@ export default function ResultsViewer({ markdown, json, jobId }: ResultsViewerPr
                 code: ({ className, children, ...props}) => {
                   const match = /language-(\w+)/.exec(className || '');
                   return match ? (
-                    <SyntaxHighlighter
-                      style={vscDarkPlus}
-                      language={match[1]}
-                      PreTag="div"
-                    >
-                      {String(children).replace(/\n$/, '')}
-                    </SyntaxHighlighter>
+                    <pre className="bg-gray-800 text-gray-100 p-4 rounded-md overflow-x-auto">
+                      <code className={`language-${match[1]} text-sm`}>
+                        {String(children).replace(/\n$/, '')}
+                      </code>
+                    </pre>
                   ) : (
                     <code className={className} {...props}>
                       {children}
@@ -166,14 +162,11 @@ export default function ResultsViewer({ markdown, json, jobId }: ResultsViewerPr
           </div>
         ) : (
           <div className="overflow-auto max-h-[600px] p-4 bg-gray-50 dark:bg-gray-900 rounded-md">
-            <SyntaxHighlighter
-              language="json"
-              style={vscDarkPlus}
-              wrapLines={true}
-              showLineNumbers={true}
-            >
-              {JSON.stringify(json, null, 2)}
-            </SyntaxHighlighter>
+            <pre className="bg-gray-800 text-gray-100 p-4 rounded-md overflow-x-auto">
+              <code className="language-json text-sm">
+                {JSON.stringify(json, null, 2)}
+              </code>
+            </pre>
           </div>
         )}
       </div>
