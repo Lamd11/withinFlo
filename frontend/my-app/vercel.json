@@ -1,8 +1,19 @@
 {
-  "buildCommand": "npm run build",
-  "outputDirectory": ".next",
-  "framework": "nextjs",
+  "version": 2,
+  "builds": [
+    {
+      "src": "package.json",
+      "use": "@vercel/next"
+    }
+  ],
+  "functions": {
+    "app/**/*.js": {
+      "maxDuration": 30
+    }
+  },
   "env": {
-    "NEXT_PUBLIC_API_URL": "https://your-backend-api-url.vercel.app/api"
+    "MONGODB_URI": "@mongodb_uri",
+    "REDIS_URL": "@redis_url",
+    "OPENAI_API_KEY": "@openai_api_key"
   }
 }
