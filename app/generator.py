@@ -1,7 +1,7 @@
 from typing import List, Dict, Any
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 import os
-from .models import AnalysisResult, TestCase, UIElement
+from app.models import AnalysisResult, TestCase, UIElement
 import json
 from datetime import datetime
 import io # Added for in-memory PDF generation

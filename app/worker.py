@@ -1,8 +1,8 @@
 from celery import Celery
-from .crawler import WebsiteCrawler
-from .analyzer import TestCaseAnalyzer
-from .generator import DocumentationGenerator
-from .models import AnalysisResult, JobStatus, JobProgress
+from app.crawler import WebsiteCrawler
+from app.analyzer import TestCaseAnalyzer
+from app.generator import DocumentationGenerator
+from app.models import AnalysisResult, JobStatus, JobProgress
 from datetime import datetime
 import os
 import logging

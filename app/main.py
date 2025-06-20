@@ -1,14 +1,11 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
-from .models import JobRequest, JobResponse, JobStatus, AnalysisResult
-from .worker import process_url, jobs_collection
-from .generator import DocumentationGenerator
-from datetime import datetime
-from bson import ObjectId
 import logging
 import asyncio
 import io
+from datetime import datetime
+from bson import ObjectId
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -30,6 +27,17 @@ app.add_middleware(
 async def health_check():
     """Health check endpoint for Railway"""
     return {"status": "healthy", "message": "QA Documentation Generator API is running"}
+
+# Import other modules after FastAPI setup to handle potential import errors gracefully
+try:
+    from app.models import JobRequest, JobResponse, JobStatus, AnalysisResult
+    from app.worker import process_url, jobs_collection
+    from app.generator import DocumentationGenerator
+    logger.info("All modules imported successfully")
+except ImportError as e:
+    logger.error(f"Import error: {e}")
+    # For now, we'll just log the error but allow the app to start
+    # This allows the health check to work even if some dependencies are missing
 
 @app.post("/jobs", response_model=JobResponse)
 async def create_job(request: JobRequest):

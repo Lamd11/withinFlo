@@ -1,6 +1,6 @@
 from typing import List, Dict, Any
 from openai import AsyncOpenAI
-from .models import UIElement, TestCase, TestStep # Assuming TestStep might be used later if parsing full steps
+from app.models import UIElement, TestCase, TestStep # Assuming TestStep might be used later if parsing full steps
 import logging
 import os
 from datetime import datetime
