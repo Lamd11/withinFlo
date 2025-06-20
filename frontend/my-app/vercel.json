@@ -4,10 +4,5 @@
     "app/**/*.js": {
       "maxDuration": 30
     }
-  },
-  "env": {
-    "MONGODB_URI": "@mongodb_uri",
-    "REDIS_URL": "@redis_url",
-    "OPENAI_API_KEY": "@openai_api_key"
   }
 }
