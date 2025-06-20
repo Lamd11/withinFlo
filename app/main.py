@@ -20,11 +20,16 @@ app = FastAPI(title="QA Documentation Generator",
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],  # Frontend URL
+    allow_origins=["*"],  # Allow all origins for production
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.get("/health")
+async def health_check():
+    """Health check endpoint for Railway"""
+    return {"status": "healthy", "message": "QA Documentation Generator API is running"}
 
 @app.post("/jobs", response_model=JobResponse)
 async def create_job(request: JobRequest):
