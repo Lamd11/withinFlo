@@ -31,12 +31,25 @@ export default function Home() {
     phase_progress: 0,
     logs: []
   });
-  const [results, setResults] = useState<{ markdown: string; json: any } | null>(null);
+  const [results, setResults] = useState<{ markdown: string; json: Record<string, unknown> } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   // Poll for job status
   useEffect(() => {
     if (!jobId || status === 'completed' || status === 'failed') return;
+
+    const fetchResults = async () => {
+      if (!jobId) return;
+
+      try {
+        const response = await fetch(`http://localhost:8000/jobs/${jobId}/results`);
+        const data = await response.json();
+        setResults(data);
+      } catch (error) {
+        console.error('Error fetching results:', error);
+        setError(error instanceof Error ? error.message : String(error));
+      }
+    };
 
     const interval = setInterval(async () => {
       try {
@@ -66,7 +79,7 @@ export default function Home() {
     return () => clearInterval(interval);
   }, [jobId, status]);
 
-  const handleSubmit = async (url: string, auth: any = null, context: any = null) => {
+  const handleSubmit = async (url: string, auth: Record<string, unknown> | null = null, context: Record<string, unknown> | null = null) => {
     setIsLoading(true);
     setError(null);
     setProgress({
@@ -103,19 +116,6 @@ export default function Home() {
     }
   };
 
-  const fetchResults = async () => {
-    if (!jobId) return;
-
-    try {
-      const response = await fetch(`http://localhost:8000/jobs/${jobId}/results`);
-      const data = await response.json();
-      setResults(data);
-    } catch (error) {
-      console.error('Error fetching results:', error);
-      setError(error instanceof Error ? error.message : String(error));
-    }
-  };
-
   return (
     <div className="min-h-screen bg-gray-100 dark:bg-gray-900">
       <Header />
@@ -127,7 +127,6 @@ export default function Home() {
           <ProgressTracker 
             status={status} 
             progress={progress}
-            logs={[]} // We're now using progress.logs instead
           />
         )}
         

@@ -18,7 +18,6 @@ import {
   ExclamationTriangleIcon, // For Priority High
   ShieldCheckIcon, // For Priority Medium
   CheckCircleIcon, // For Priority Low
-  AdjustmentsHorizontalIcon, // For filters
   DocumentTextIcon, // For Raw Markdown toggle
   ChartBarIcon, // For Stats
   ArrowUpIcon,
@@ -116,7 +115,7 @@ export default function TestCaseViewer({ markdown }: TestCaseViewerProps) {
       const priority = priorityMatch ? priorityMatch[1].trim() : 'Medium'; // Default if not found
       
       const descriptionMatch = section.match(/\*\s*\*\*Description:\*\*\s*([\s\S]*?)(?=\n\*\s*\*\*Primary Element|\n\*\s*\*\*Related Elements|\n\*\s*\*\*Preconditions|\n\*\s*\*\*Steps|\n\*\s*\*\*Postconditions|\n*$)/i);
-      let description = descriptionMatch ? descriptionMatch[1].trim() : '';
+      const description = descriptionMatch ? descriptionMatch[1].trim() : '';
 
       const primaryElementMatch = section.match(/\*\s*\*\*(?:Primary\s+Element\s+Under\s+Test|Element\s+Under\s+Test):\*\*\s*([\s\S]*?)(?=\n\*\s*\*\*|\n*$)/i);
       let primaryElement;
@@ -141,7 +140,7 @@ export default function TestCaseViewer({ markdown }: TestCaseViewerProps) {
       }
 
       const stepsMatch = section.match(/\*\s*\*\*Steps:\*\*\s*([\s\S]*?)(?=\n\*\s*\*\*Postconditions|\n\*\s*\*\*|\n*$)/i);
-      let steps = [];
+      const steps = [];
       if (stepsMatch) {
         const stepPattern = /\d+\.\s*\*\*Action:\*\*\s*([\s\S]*?)\s*\*\*Expected\s+Result:\*\*\s*([\s\S]*?)(?=\n\s*\d+\.\s*\*\*Action|\n*$)/gi;
         let stepDetailMatch;
@@ -249,10 +248,7 @@ export default function TestCaseViewer({ markdown }: TestCaseViewerProps) {
   
   // Pagination logic
   const pageCount = Math.ceil(filteredTestCases.length / itemsPerPage);
-  const indexOfLastItem = currentPage * itemsPerPage;
-  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  const currentItems = filteredTestCases.slice(indexOfFirstItem, indexOfLastItem);
-  
+
   // Extract raw markdown for each test case
   const getTestCaseRawMarkdown = (id: string): string => {
     const testCase = testCases.find(tc => tc.id === id);

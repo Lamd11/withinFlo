@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 
 interface UrlFormProps {
-  onSubmit: (url: string, auth: any, context: any) => void;
+  onSubmit: (url: string, auth: Record<string, unknown> | null, context: Record<string, unknown> | null) => void;
   isLoading: boolean;
 }
 
@@ -36,7 +36,7 @@ export default function UrlForm({ onSubmit, isLoading }: UrlFormProps) {
       new URL(value);
       setUrlError('');
       return true;
-    } catch (e) {
+    } catch {
       setUrlError('Please enter a valid URL (e.g., https://example.com)');
       return false;
     }

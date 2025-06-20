@@ -8,7 +8,7 @@ import TestCaseViewer from './TestCaseViewer';
 
 interface ResultsViewerProps {
   markdown: string;
-  json: any;
+  json: Record<string, unknown>;
   jobId: string;
 }
 
@@ -143,11 +143,11 @@ export default function ResultsViewer({ markdown, json, jobId }: ResultsViewerPr
           <div className="prose prose-indigo dark:prose-invert max-w-none overflow-auto max-h-[600px] p-4 bg-gray-50 dark:bg-gray-900 rounded-md">
             <ReactMarkdown
               components={{
-                code: ({node, className, children, ...props}) => {
+                code: ({ className, children, ...props}) => {
                   const match = /language-(\w+)/.exec(className || '');
                   return match ? (
                     <SyntaxHighlighter
-                      style={vscDarkPlus as any}
+                      style={vscDarkPlus}
                       language={match[1]}
                       PreTag="div"
                     >
@@ -168,7 +168,7 @@ export default function ResultsViewer({ markdown, json, jobId }: ResultsViewerPr
           <div className="overflow-auto max-h-[600px] p-4 bg-gray-50 dark:bg-gray-900 rounded-md">
             <SyntaxHighlighter
               language="json"
-              style={vscDarkPlus as any}
+              style={vscDarkPlus}
               wrapLines={true}
               showLineNumbers={true}
             >

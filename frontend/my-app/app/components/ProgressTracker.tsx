@@ -1,17 +1,6 @@
 'use client';
 
 import React, { useState } from 'react';
-import { ChartBarIcon, CheckCircleIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
-
-interface JobProgress {
-  total_elements: number;
-  processed_elements: number;
-  total_test_cases: number;
-  generated_test_cases: number;
-  current_phase: string;
-  phase_progress: number;
-  logs: string[];
-}
 
 interface ProgressTrackerProps {
   status: Status;
@@ -23,14 +12,13 @@ interface ProgressTrackerProps {
     total_elements: number;
     generated_test_cases: number;
   };
-  logs: string[];
 }
 
 // Add type definitions at the top of the file
 type Phase = 'queue' | 'crawling' | 'analysis' | 'complete';
 type Status = 'pending' | 'crawling' | 'analyzing' | 'generating' | 'completed' | 'failed';
 
-export default function ProgressTracker({ status, progress, logs }: ProgressTrackerProps) {
+export default function ProgressTracker({ status, progress }: ProgressTrackerProps) {
   const [showAdvanced, setShowAdvanced] = useState(false);
 
   const getStatusText = () => {

@@ -1,8 +1,7 @@
 'use client';
 
-import React from '@react-pdf/renderer';
-
-const { Document, Page, Text, View, StyleSheet, Font } = React;
+import React from 'react';
+import { Document, Page, Text, View, StyleSheet } from '@react-pdf/renderer';
 
 // Define default font (optional, but good for consistency and non-Latin characters)
 // You might need to host the font file in your public directory
