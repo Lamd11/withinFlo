@@ -4,6 +4,7 @@ from fastapi.responses import StreamingResponse
 import logging
 import asyncio
 import io
+import os
 from datetime import datetime
 from bson import ObjectId
 
@@ -14,14 +15,23 @@ logger = logging.getLogger(__name__)
 app = FastAPI(title="QA Documentation Generator",
              description="AI-powered tool for generating test documentation from website analysis")
 
-# Add CORS middleware
+# Add CORS middleware - Configure for your Vercel frontend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allow all origins for production
+    allow_origins=[
+        "*",  # Allow all origins for now - you should restrict this to your Vercel domain
+        "https://*.vercel.app",
+        "http://localhost:3000",  # For local development
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.get("/")
+async def root():
+    """Root endpoint"""
+    return {"message": "QA Documentation Generator API", "status": "running", "docs": "/docs"}
 
 @app.get("/health")
 async def health_check():

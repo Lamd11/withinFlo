@@ -5,4 +5,10 @@ builder = "dockerfile"
 healthcheckPath = "/health"
 healthcheckTimeout = 300
 restartPolicyType = "on_failure"
-restartPolicyMaxRetries = 10 
+restartPolicyMaxRetries = 10
+
+# Environment variables that need to be set in Railway dashboard
+# MONGODB_URI - Your MongoDB connection string
+# REDIS_URL - Your Redis connection string  
+# OPENAI_API_KEY - Your OpenAI API key
+# PORT - Railway sets this automatically 

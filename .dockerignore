@@ -1,0 +1,46 @@
+# Exclude frontend directory since it's deployed separately on Vercel
+frontend/
+
+# Exclude development and test files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.coverage
+.tox/
+.env
+.env.local
+.env.development
+.env.test
+
+# Exclude git and documentation
+.git/
+.gitignore
+*.md
+LICENSE*
+
+# Exclude IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Exclude deployment configs for other platforms
+deploy-guide.md
+test_*.py
+scripts/
+
+# Exclude build artifacts
+dist/
+build/
+*.egg-info/
+
+# Exclude logs
+*.log
+logs/
+
+# Exclude node modules if any
+node_modules/
+yarn.lock
+package-lock.json 
