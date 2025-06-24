@@ -1,11 +1,16 @@
 [build]
 builder = "dockerfile"
 
-[deploy]
+# Web service (FastAPI)
+[deploy.web]
 startCommand = "./start.sh"
 
+# Worker service (Celery)
+[deploy.worker]
+startCommand = "./worker.sh"
+
 # Environment variables that need to be set in Railway dashboard
-# MONGODB_URI - Your MongoDB connection string
-# REDIS_URL - Your Redis connection string  
-# OPENAI_API_KEY - Your OpenAI API key
+# MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/qa_doc_generator
+# REDIS_URL=redis://default:password@host:port
+# OPENAI_API_KEY=sk-your-openai-api-key-here
 # PORT - Railway sets this automatically 
