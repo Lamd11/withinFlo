@@ -27,8 +27,5 @@ COPY . .
 # Make the startup script executable
 RUN chmod +x start.sh
 
-# Expose port (Railway will set the PORT environment variable)
-EXPOSE $PORT
-
-# Use the startup script
+# Start the application using the startup script
 CMD ["./start.sh"] 
