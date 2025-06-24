@@ -33,11 +33,6 @@ async def root():
     """Root endpoint"""
     return {"message": "QA Documentation Generator API", "status": "running", "docs": "/docs"}
 
-@app.get("/health")
-async def health_check():
-    """Health check endpoint for Railway"""
-    return {"status": "healthy", "message": "QA Documentation Generator API is running"}
-
 # Import other modules after FastAPI setup to handle potential import errors gracefully
 try:
     from app.models import JobRequest, JobResponse, JobStatus, AnalysisResult

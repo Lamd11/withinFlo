@@ -41,8 +41,7 @@ Railway will automatically deploy using the `Dockerfile`. The deployment process
 1. Builds the Docker image
 2. Installs Python dependencies
 3. Installs Playwright browsers
-4. Runs health checks on `/health` endpoint
-5. Starts the server
+4. Starts the server
 
 ### 5. Get Your API URL
 After deployment, Railway will provide a URL like:
@@ -64,7 +63,6 @@ const API_URL = 'https://your-app-name.railway.app'
 ## API Endpoints
 Your deployed API will have these endpoints:
 - `GET /` - Root endpoint
-- `GET /health` - Health check (used by Railway)
 - `GET /docs` - FastAPI documentation
 - `POST /jobs` - Create analysis job
 - `GET /jobs/{job_id}/status` - Get job status
@@ -91,13 +89,13 @@ To add a Celery worker:
 - Ensure Redis is accessible
 - Check OpenAI API key validity
 
-### Health Check Failures
-- Railway expects the `/health` endpoint to return 200 status
+### Connection Issues
 - Check if the app is starting correctly
+- Verify all environment variables are set
 
 ## Monitoring
 - Use Railway's built-in metrics and logs
-- Monitor the `/health` endpoint
+- Monitor the root `/` endpoint
 - Check MongoDB and Redis connection status
 
 ## Security Notes
