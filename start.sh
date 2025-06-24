@@ -21,12 +21,8 @@ if [ -z "$OPENAI_API_KEY" ]; then
     exit 1
 fi
 
-# Set default port if not provided
-DEFAULT_PORT=8000
-PORT="${PORT:-$DEFAULT_PORT}"
-
 echo "✅ Environment variables verified"
-echo "🌐 Starting server on port $PORT"
+echo "🌐 Starting server on port 8000"
 
-# Start the FastAPI application with explicit port number
-exec uvicorn app.main:app --host 0.0.0.0 --port="${PORT}" --workers 1 
+# Start the FastAPI application with fixed port 8000
+exec uvicorn app.main:app --host 0.0.0.0 --port=8000 --workers 1 
