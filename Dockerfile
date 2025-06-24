@@ -2,8 +2,10 @@ FROM python:3.9-slim
 
 WORKDIR /code
 
-# Install system dependencies for Playwright
+# Install system dependencies
 RUN apt-get update && apt-get install -y \
+    build-essential \
+    libmupdf-dev \
     wget \
     gnupg \
     && rm -rf /var/lib/apt/lists/*
