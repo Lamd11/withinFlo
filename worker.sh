@@ -3,7 +3,7 @@
 # Exit on any error
 set -e
 
-echo "🚀 Starting QA Documentation Generator API..."
+echo "🔄 Starting Celery Worker Service..."
 
 # Verify required environment variables
 if [ -z "$MONGODB_URI" ]; then
@@ -22,8 +22,7 @@ if [ -z "$OPENAI_API_KEY" ]; then
 fi
 
 echo "✅ Environment variables verified"
-echo "🌐 Starting FastAPI server on port 8000"
-echo "⚠️  Note: Celery worker should be deployed as a separate Railway service"
+echo "🔄 Starting Celery worker..."
 
-# Start the FastAPI application with fixed port 8000
-exec uvicorn app.main:app --host 0.0.0.0 --port=8000 --workers 1 
+# Start the Celery worker
+exec celery -A app.worker worker --loglevel=info --concurrency=2 

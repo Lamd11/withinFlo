@@ -24,8 +24,8 @@ RUN playwright install --with-deps chromium
 # Copy the application
 COPY . .
 
-# Make the startup script executable
-RUN chmod +x start.sh
+# Make the startup scripts executable
+RUN chmod +x start.sh worker.sh
 
 # Start the application using the startup script
 CMD ["./start.sh"] 
