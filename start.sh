@@ -22,7 +22,15 @@ if [ -z "$OPENAI_API_KEY" ]; then
 fi
 
 echo "✅ Environment variables verified"
-echo "🌐 Starting server on port 8000"
+
+# Start Celery worker in the background
+echo "🔄 Starting Celery worker..."
+celery -A app.worker worker --loglevel=info --detach
+
+# Give Celery a moment to start
+sleep 2
+
+echo "🌐 Starting FastAPI server on port 8000"
 
 # Start the FastAPI application with fixed port 8000
 exec uvicorn app.main:app --host 0.0.0.0 --port=8000 --workers 1 
