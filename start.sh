@@ -21,9 +21,12 @@ if [ -z "$OPENAI_API_KEY" ]; then
     exit 1
 fi
 
+# Set port (Railway provides PORT env var)
+PORT=${PORT:-8000}
+
 echo "✅ Environment variables verified"
-echo "🌐 Starting FastAPI server on port 8000"
+echo "🌐 Starting FastAPI server on port $PORT"
 echo "ℹ️  Worker service will be deployed separately"
 
-# Start the FastAPI application with fixed port 8000
-exec uvicorn app.main:app --host 0.0.0.0 --port=8000 --workers 1 
+# Start the FastAPI application
+exec uvicorn app.main:app --host 0.0.0.0 --port=$PORT --workers 1 
